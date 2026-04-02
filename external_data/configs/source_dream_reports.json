@@ -1,0 +1,50 @@
+{
+  "adapter": "csv",
+  "delimiter": ",",
+  "mapping": {
+    "timestamp": {
+      "column": "dream_timestamp"
+    },
+    "modality": {
+      "value": "dream"
+    },
+    "source": {
+      "column": "participant_id"
+    },
+    "signal_type": {
+      "value": "dream_report"
+    },
+    "value": {
+      "column": "dream_text"
+    },
+    "unit": {
+      "value": "text"
+    },
+    "context": {
+      "include": [
+        "dream_report_id",
+        "row_number",
+        "raw_dream_date",
+        "word_count",
+        "survey_name",
+        "survey_id",
+        "question",
+        "categories",
+        "gender",
+        "age"
+      ],
+      "static": {
+        "dataset": "Sleep and Dream Database"
+      }
+    },
+    "temporal": {
+      "event_kind": {
+        "value": "report"
+      },
+      "sequence_index": {
+        "column": "row_number",
+        "cast": "int"
+      }
+    }
+  }
+}

@@ -1,0 +1,608 @@
+{
+  "unification_integrity": {
+    "is_unified": true,
+    "canonical_top_level_fields": [
+      "timestamp",
+      "modality",
+      "source",
+      "signal_type",
+      "value",
+      "unit",
+      "contextual_metadata"
+    ],
+    "route_summaries": {
+      "eeg_config": {
+        "record_count": 10,
+        "top_level_keys_ok": true,
+        "temporal_contract_ok": true,
+        "bundle_contract_ok": true,
+        "assertion_basis_ok": true,
+        "unresolved_ok": true,
+        "modality_primary_sense_consistent": true
+      },
+      "olfaction_config": {
+        "record_count": 3,
+        "top_level_keys_ok": true,
+        "temporal_contract_ok": true,
+        "bundle_contract_ok": true,
+        "assertion_basis_ok": true,
+        "unresolved_ok": true,
+        "modality_primary_sense_consistent": true
+      },
+      "multisensory_auto": {
+        "record_count": 6,
+        "top_level_keys_ok": true,
+        "temporal_contract_ok": true,
+        "bundle_contract_ok": true,
+        "assertion_basis_ok": true,
+        "unresolved_ok": true,
+        "modality_primary_sense_consistent": true
+      },
+      "generic_packet": {
+        "record_count": 19,
+        "top_level_keys_ok": true,
+        "temporal_contract_ok": true,
+        "bundle_contract_ok": true,
+        "assertion_basis_ok": true,
+        "unresolved_ok": true,
+        "modality_primary_sense_consistent": true
+      },
+      "typed_packet": {
+        "record_count": 7,
+        "top_level_keys_ok": true,
+        "temporal_contract_ok": true,
+        "bundle_contract_ok": true,
+        "assertion_basis_ok": true,
+        "unresolved_ok": true,
+        "modality_primary_sense_consistent": true
+      }
+    },
+    "semantic_findings": [
+      "All inspected routes still emit the same seven-field top-level event schema.",
+      "Temporal semantics continue to flow through contextual_metadata.temporal across manual, auto-routed, packet, and typed-packet paths.",
+      "assertion_basis and unresolved are normalized and validated through the same metadata standardizer.",
+      "Packet-specific and route-specific metadata remain inside contextual_metadata rather than creating route-specific top-level schemas.",
+      "No inspected route bypasses TemporalEvent serialization or bundle generation."
+    ],
+    "fragmentation_risks": [
+      {
+        "risk": "viewer_alias_fields",
+        "severity": "low",
+        "detail": "viewer/app.py writes convenience aliases such as sensory_class and top-level acquisition_profile alongside the canonical sensory and acquisition blocks. These do not fork the contract, but they duplicate canonical meanings."
+      },
+      {
+        "risk": "modality_subtype_overloading",
+        "severity": "low",
+        "detail": "packet-derived modalities such as olfaction_perception and olfaction_aggregate are valid subtypes, but they rely on contextual_metadata.sensory.primary_sense to keep sensory semantics aligned with broader routes."
+      }
+    ]
+  },
+  "false_positive_restraint": [
+    {
+      "name": "null_structure_restraint",
+      "suite": "false_positive_restraint",
+      "support": "Only generic samples are present, with no explicit segment markers or packet declarations.",
+      "expected_claims": [
+        "No phase, experience, or stimulus structure should be invented."
+      ],
+      "unresolved_if_unsupported": [
+        "All higher-order experience structure remains absent."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "ambiguous_route_restraint",
+      "suite": "false_positive_restraint",
+      "support": "The file mixes strong EEG and olfaction route evidence.",
+      "expected_claims": [
+        "The route must remain unresolved and raise an explicit ambiguity error."
+      ],
+      "unresolved_if_unsupported": [
+        "No acquisition route should be guessed."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": [
+        "ambiguous deterministic route evidence: eeg (recognized EEG channel names were detected), olfaction (olfaction-specific fields were detected)"
+      ]
+    },
+    {
+      "name": "missing_context_restraint",
+      "suite": "false_positive_restraint",
+      "support": "Behavior markers are present, but no stimulus marker type or source stimulus block exists.",
+      "expected_claims": [
+        "No stimulus block should be fabricated."
+      ],
+      "unresolved_if_unsupported": [
+        "Stimulus context remains absent."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "broken_continuity_restraint",
+      "suite": "false_positive_restraint",
+      "support": "The sampled stream has a deterministic temporal gap inside an otherwise marked segment.",
+      "expected_claims": [
+        "Continuity may be interrupted or fragmented, but not continuous."
+      ],
+      "unresolved_if_unsupported": [
+        "No continuous experience claim is allowed across a verified gap."
+      ],
+      "passed": true,
+      "observed": [
+        "interrupted"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "cross_event_relation_restraint",
+      "suite": "false_positive_restraint",
+      "support": "A report marker exists, but there is no supported experience membership.",
+      "expected_claims": [
+        "A report phase is allowed, but no describes relation should be invented."
+      ],
+      "unresolved_if_unsupported": [
+        "Experience relation targets remain absent."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "noise_only_phase_restraint",
+      "suite": "false_positive_restraint",
+      "support": "Active samples are noisy and do not form a deterministic phase trajectory.",
+      "expected_claims": [
+        "No meaningful rise, peak, decay, or offset phases should be asserted."
+      ],
+      "unresolved_if_unsupported": [
+        "temporal.phase remains unresolved because the decay is non-monotonic."
+      ],
+      "passed": true,
+      "observed": [
+        "non_monotonic_decay"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "malformed_input_restraint",
+      "suite": "false_positive_restraint",
+      "support": "The raw JSON file is syntactically invalid.",
+      "expected_claims": [
+        "The system must fail safely and explicitly."
+      ],
+      "unresolved_if_unsupported": [
+        "No route or structure should be guessed from malformed input."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": [
+        "invalid JSON input: Expecting value"
+      ]
+    }
+  ],
+  "supported_structure_recovery": [
+    {
+      "name": "explicit_stimulus_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "Source annotations explicitly mark stimulus onset and stimulus offset with marker_type=stimulus.",
+      "expected_claims": [
+        "Stimulus onset and offset markers retain stimulus blocks.",
+        "presentation_phase and delivery_state are deterministically derived on those explicit markers."
+      ],
+      "unresolved_if_unsupported": [
+        "stimulus_object remains absent because it was never supplied."
+      ],
+      "passed": true,
+      "observed": [
+        "onset",
+        "offset"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "valid_continuity_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "Timestamps, sequence indices, and sample spacing are internally continuous across the deterministic benchmark.",
+      "expected_claims": [
+        "The experience continuity state resolves to continuous."
+      ],
+      "unresolved_if_unsupported": [
+        "No continuity_state should remain unresolved for this case."
+      ],
+      "passed": true,
+      "observed": [
+        "continuous"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "phase_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "The benchmark includes a baseline sample, explicit onset/offset, a monotonic rise to peak, monotonic decay, and trailing post-offset samples.",
+      "expected_claims": [
+        "baseline, onset, rise, peak, decay, offset, aftereffect, and recovery are recovered where supported.",
+        "report is recovered on the explicit verbal report marker."
+      ],
+      "unresolved_if_unsupported": [
+        "sustain remains absent because the signal never forms a plateau."
+      ],
+      "passed": true,
+      "observed": [
+        "aftereffect",
+        "baseline",
+        "decay",
+        "offset",
+        "onset",
+        "peak",
+        "recovery",
+        "report",
+        "rise"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "provenance_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "The source metadata explicitly provide acquisition profile, instrument, device class, recording_id, subject_id, and trial_id.",
+      "expected_claims": [
+        "Explicit acquisition metadata are preserved with source_provided basis.",
+        "Explicit alignment identifiers remain attached as provenance context."
+      ],
+      "unresolved_if_unsupported": [
+        "No extra device or alignment identifiers are invented beyond the supplied values."
+      ],
+      "passed": true,
+      "observed": [
+        "benchmark_eeg_cap",
+        "rec-001"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "relation_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "The report marker falls inside a supported deterministic experience with explicit onset and offset markers.",
+      "expected_claims": [
+        "The report marker preserves a describes relation to the resolved experience.",
+        "Events preserve shared part_of stream and experience relations."
+      ],
+      "unresolved_if_unsupported": [
+        "No caused_by or unsupported causal relations are asserted."
+      ],
+      "passed": true,
+      "observed": [
+        "experience::eeg::rec_01::001"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "route_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "Route evidence is strong and unambiguous for EEG JSON, olfaction table, multisensory matrix, and the typed Synapse packet directory.",
+      "expected_claims": [
+        "Generic auto-routing resolves strong routes rather than downgrading them to unresolved.",
+        "The typed packet is detected and planned through its dedicated packet profile."
+      ],
+      "unresolved_if_unsupported": [
+        "No route remains ambiguous in these benchmark cases."
+      ],
+      "passed": true,
+      "observed": [
+        "eeg",
+        "olfaction",
+        "multisensory",
+        "dream_synapse"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "packet_provenance_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "The typed packet declares olfaction, packet profile identity, and packet-level acquisition metadata.",
+      "expected_claims": [
+        "Packet-declared sensory and acquisition metadata are preserved with packet_declared basis.",
+        "Packet completeness and profile provenance remain attached to normalized events."
+      ],
+      "unresolved_if_unsupported": [
+        "Absolute time remains partial rather than fabricated."
+      ],
+      "passed": true,
+      "observed": [
+        "dream_synapse"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    },
+    {
+      "name": "tabular_context_recovery",
+      "suite": "supported_structure_recovery",
+      "support": "The tabular olfaction observation file supplies timestamp, source, trial_id, and humidity_pct directly.",
+      "expected_claims": [
+        "Explicit row metadata are preserved inside contextual_metadata without weakening the shared event schema."
+      ],
+      "unresolved_if_unsupported": [
+        "No sample-level phase or continuity is invented for row-style observations."
+      ],
+      "passed": true,
+      "observed": [
+        "T-001"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [],
+      "notes": []
+    }
+  ],
+  "collection_quality": [
+    {
+      "name": "missing_stimulus_markers",
+      "suite": "collection_quality",
+      "support": "Only sampled values exist; no stimulus markers or declared packet segments exist.",
+      "expected_claims": [
+        "Higher-order experience structure remains unresolved."
+      ],
+      "unresolved_if_unsupported": [
+        "No phases, stimulus blocks, or experience membership are created."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "missing_stimulus_markers"
+      ],
+      "notes": [
+        "The unresolved output is caused by missing stimulus annotation rather than TSEL under-claiming."
+      ]
+    },
+    {
+      "name": "missing_acquisition_metadata",
+      "suite": "collection_quality",
+      "support": "The source defines a sampled EEG stream but omits explicit instrument and device class.",
+      "expected_claims": [
+        "Observed sample_rate and channel are retained, but instrument and device class remain absent."
+      ],
+      "unresolved_if_unsupported": [
+        "Missing acquisition metadata are not silently completed."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "missing_acquisition_metadata"
+      ],
+      "notes": [
+        "This unresolved area reflects missing source acquisition metadata."
+      ]
+    },
+    {
+      "name": "weak_provenance",
+      "suite": "collection_quality",
+      "support": "The source provides only a source identifier and no session, recording, subject, or trial identifiers.",
+      "expected_claims": [
+        "source_id is preserved, but no stronger alignment context is fabricated."
+      ],
+      "unresolved_if_unsupported": [
+        "Session, recording, subject, and trial provenance remain absent."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "weak_provenance"
+      ],
+      "notes": [
+        "Weak provenance is visible in the normalized output and not hidden by defaults."
+      ]
+    },
+    {
+      "name": "inadequate_temporal_resolution",
+      "suite": "collection_quality",
+      "support": "The olfaction table contains timestamped observations but not high-resolution within-episode sampled trajectories.",
+      "expected_claims": [
+        "Row observations stay as observations; phase and continuity richness is not forced."
+      ],
+      "unresolved_if_unsupported": [
+        "No baseline, rise, peak, or recovery structure is invented from sparse rows."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "inadequate_temporal_resolution"
+      ],
+      "notes": [
+        "This is an upstream collection-resolution limitation, not a TSEL failure."
+      ]
+    },
+    {
+      "name": "insufficient_pre_post_windows",
+      "suite": "collection_quality",
+      "support": "The deterministic stream contains explicit onset and offset but omits baseline samples and post-offset trailing samples.",
+      "expected_claims": [
+        "Supported stimulus phases are retained, but baseline and aftereffect/recovery remain absent."
+      ],
+      "unresolved_if_unsupported": [
+        "No baseline or recovery phases are claimed without supporting windows."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "insufficient_pre_stimulus_window",
+        "insufficient_post_stimulus_window"
+      ],
+      "notes": [
+        "The missing windows are visible as absent supported phases rather than as fabricated structure."
+      ]
+    },
+    {
+      "name": "broken_timestamp_continuity",
+      "suite": "collection_quality",
+      "support": "A marked experience contains a verified internal temporal gap.",
+      "expected_claims": [
+        "The experience cannot remain continuous across the gap."
+      ],
+      "unresolved_if_unsupported": [
+        "Continuity downgrades to interrupted or fragmented."
+      ],
+      "passed": true,
+      "observed": [
+        "interrupted"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [
+        "broken_timestamp_continuity"
+      ],
+      "notes": [
+        "The continuity downgrade is driven by sample spacing, not by a heuristic guess."
+      ]
+    },
+    {
+      "name": "incomplete_packet_annotation",
+      "suite": "collection_quality",
+      "support": "The packet directory is missing a required typed-packet member.",
+      "expected_claims": [
+        "Typed packet detection refuses to treat the directory as a complete packet profile."
+      ],
+      "unresolved_if_unsupported": [
+        "Packet-level declarations remain unavailable."
+      ],
+      "passed": true,
+      "observed": [
+        "LBs2.txt"
+      ],
+      "failure_classification": null,
+      "upstream_issues": [
+        "incomplete_packet_annotation"
+      ],
+      "notes": [
+        "The missing file list identifies the upstream packet annotation gap directly."
+      ]
+    },
+    {
+      "name": "ambiguous_route_evidence",
+      "suite": "collection_quality",
+      "support": "The input contains equally strong EEG and olfaction evidence in one flat table.",
+      "expected_claims": [
+        "The route remains ambiguous rather than being forced into one profile."
+      ],
+      "unresolved_if_unsupported": [
+        "Automatic route remains unresolved."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "ambiguous_route_evidence"
+      ],
+      "notes": [
+        "ambiguous deterministic route evidence: eeg (recognized EEG channel names were detected), olfaction (olfaction-specific fields were detected)"
+      ]
+    },
+    {
+      "name": "missing_contextual_labels",
+      "suite": "collection_quality",
+      "support": "Markers exist, but they are typed only as generic behavior and never labeled as stimulus markers.",
+      "expected_claims": [
+        "The events remain unstimulated behavior context; no stimulus object is invented."
+      ],
+      "unresolved_if_unsupported": [
+        "Stimulus context remains absent."
+      ],
+      "passed": true,
+      "observed": [],
+      "failure_classification": null,
+      "upstream_issues": [
+        "missing_contextual_labels"
+      ],
+      "notes": [
+        "The missing label weakness is visible in output restraint rather than being silently repaired."
+      ]
+    }
+  ],
+  "balance_metrics": {
+    "false_positive_restraint_success": {
+      "passed": 7,
+      "total": 7
+    },
+    "supported_structure_recovery_success": {
+      "passed": 8,
+      "total": 8
+    },
+    "unresolved_outputs_due_to_insufficient_data": {
+      "count": 9,
+      "cases": [
+        "missing_stimulus_markers",
+        "missing_acquisition_metadata",
+        "weak_provenance",
+        "inadequate_temporal_resolution",
+        "insufficient_pre_post_windows",
+        "broken_timestamp_continuity",
+        "incomplete_packet_annotation",
+        "ambiguous_route_evidence",
+        "missing_contextual_labels"
+      ]
+    },
+    "unresolved_outputs_due_to_rule_strictness": {
+      "count": 0,
+      "cases": []
+    },
+    "unresolved_outputs_due_to_missing_metadata_or_collection_quality": {
+      "count": 9,
+      "cases": [
+        "missing_stimulus_markers",
+        "missing_acquisition_metadata",
+        "weak_provenance",
+        "inadequate_temporal_resolution",
+        "insufficient_pre_post_windows",
+        "broken_timestamp_continuity",
+        "incomplete_packet_annotation",
+        "ambiguous_route_evidence",
+        "missing_contextual_labels"
+      ]
+    },
+    "collection_quality_issue_counts": {
+      "ambiguous_route_evidence": 1,
+      "broken_timestamp_continuity": 1,
+      "inadequate_temporal_resolution": 1,
+      "incomplete_packet_annotation": 1,
+      "insufficient_post_stimulus_window": 1,
+      "insufficient_pre_stimulus_window": 1,
+      "missing_acquisition_metadata": 1,
+      "missing_contextual_labels": 1,
+      "missing_stimulus_markers": 1,
+      "weak_provenance": 1
+    }
+  }
+}

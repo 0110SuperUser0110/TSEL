@@ -1,0 +1,34 @@
+{
+  "adapter": "timeseries_csv",
+  "delimiter": "\t",
+  "timestamp": { "column": "timestamp" },
+  "modality": { "value": "olfaction_perception" },
+  "source": { "column": "subject_id" },
+  "sample_rate": { "value": 1.0, "cast": "float" },
+  "auto_channels": {
+    "exclude": [
+      "compound_id",
+      "odor_name",
+      "replicate_label",
+      "intensity_label",
+      "dilution"
+    ],
+    "signal_type_strategy": "channel_name",
+    "default_unit": "rating",
+    "cast": "float"
+  },
+  "context": {
+    "include": [
+      "compound_id",
+      "odor_name",
+      "replicate_label",
+      "intensity_label",
+      "dilution"
+    ],
+    "static": {
+      "dataset": "DREAM Olfaction Prediction Challenge",
+      "challenge_partition": "train",
+      "temporal_basis": "synthetic_sequence"
+    }
+  }
+}

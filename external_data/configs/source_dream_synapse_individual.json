@@ -1,0 +1,24 @@
+{
+  "adapter": "csv",
+  "delimiter": "\t",
+  "mapping": {
+    "timestamp": { "column": "timestamp" },
+    "modality": { "value": "olfaction_perception" },
+    "source": { "column": "subject_id" },
+    "signal_type": { "column": "descriptor" },
+    "value": { "column": "value", "cast": "float" },
+    "unit": { "value": "rating" },
+    "context": {
+      "include": ["compound_id", "challenge_split"],
+      "static": {
+        "dataset": "DREAM Olfaction Prediction Challenge",
+        "temporal_basis": "synthetic_sequence"
+      }
+    },
+    "temporal": {
+      "event_kind": { "value": "observation" },
+      "stream_id": { "column": "subject_id" },
+      "sequence_index": { "column": "sequence_index", "cast": "int" }
+    }
+  }
+}

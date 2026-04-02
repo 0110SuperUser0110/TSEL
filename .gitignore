@@ -1,0 +1,7 @@
+﻿__pycache__/
+.pytest_cache/
+.pytest-tmp/
+pytest-cache-files-*/
+*.pyc
+output/
+external_data/raw/

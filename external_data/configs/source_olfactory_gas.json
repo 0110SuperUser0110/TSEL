@@ -1,0 +1,35 @@
+{
+  "adapter": "timeseries_csv",
+  "delimiter": ",",
+  "timestamp": {
+    "column": "timestamp"
+  },
+  "modality": {
+    "value": "olfaction"
+  },
+  "source": {
+    "column": "source_batch"
+  },
+  "sample_rate": {
+    "value": 1.0,
+    "cast": "float"
+  },
+  "auto_channels": {
+    "exclude": [
+      "batch_row",
+      "gas_class"
+    ],
+    "signal_type_strategy": "channel_name",
+    "default_unit": "feature_value"
+  },
+  "context": {
+    "include": [
+      "batch_row",
+      "gas_class"
+    ],
+    "static": {
+      "dataset": "UCI Gas Sensor Array Drift Dataset",
+      "source_time_basis": "relative_sequence"
+    }
+  }
+}

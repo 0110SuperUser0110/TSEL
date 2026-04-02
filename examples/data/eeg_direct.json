@@ -1,0 +1,26 @@
+{
+  "start_time": "2026-03-15T15:30:00Z",
+  "sample_rate_hz": 4,
+  "source": "EEG-RAW-01",
+  "metadata": {
+    "dataset": "synthetic_direct_eeg",
+    "montage": "10-20",
+    "condition": "odor discrimination"
+  },
+  "channels": {
+    "Fp1": [12.1, 12.4, 12.0, 11.8],
+    "Fp2": [11.7, 11.9, 12.2, 12.0]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "odor_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 3,
+      "label": "response_window",
+      "marker_type": "behavior"
+    }
+  ]
+}

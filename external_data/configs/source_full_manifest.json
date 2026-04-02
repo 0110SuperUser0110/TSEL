@@ -1,0 +1,44 @@
+{
+  "jobs": [
+    {
+      "input": "../curated/olfactory_gas_batch1_sample.csv",
+      "config": "source_olfactory_gas.json"
+    },
+    {
+      "input": "../curated/dream_reports_sample.csv",
+      "config": "source_dream_reports.json"
+    },
+    {
+      "input": "../raw/SC4401E0-PSG.edf",
+      "config": "source_sleep_edf.json"
+    },
+    {
+      "input": "../raw/SC4401EC-Hypnogram.edf",
+      "config": "source_sleep_hypnogram.json"
+    },
+    {
+      "input": "../curated/dream_synapse_train_sample.tsv",
+      "config": "source_dream_synapse_train.json"
+    },
+    {
+      "input": "../curated/dream_synapse_leaderboard_individual_sample.tsv",
+      "config": "source_dream_synapse_individual.json"
+    },
+    {
+      "input": "../curated/dream_synapse_lbs1_individual_sample.tsv",
+      "config": "source_dream_synapse_individual.json"
+    },
+    {
+      "input": "../curated/dream_synapse_lbs2_aggregate_sample.tsv",
+      "config": "source_dream_synapse_aggregate.json"
+    },
+    {
+      "input": "../curated/dream_synapse_molecular_sample.tsv",
+      "config": "source_dream_synapse_molecular.json"
+    },
+    {
+      "input": "../curated/dream_synapse_split_registry.tsv",
+      "config": "source_dream_synapse_split_registry.json"
+    }
+  ]
+}

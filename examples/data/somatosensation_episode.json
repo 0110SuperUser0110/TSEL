@@ -1,0 +1,44 @@
+{
+  "start_time": "2026-03-15T12:40:00Z",
+  "sample_rate_hz": 4,
+  "source": "TOUCH-01",
+  "metadata": {
+    "dataset": "synthetic_touch_episode",
+    "condition": "tactile contact"
+  },
+  "channels": {
+    "contact_pressure": [
+      0.0,
+      0.25,
+      0.7,
+      0.88,
+      0.5,
+      0.1
+    ],
+    "skin_response": [
+      0.05,
+      0.1,
+      0.22,
+      0.35,
+      0.2,
+      0.08
+    ]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "touch_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 4,
+      "label": "touch_offset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 5,
+      "label": "touch_report",
+      "marker_type": "behavior"
+    }
+  ]
+}

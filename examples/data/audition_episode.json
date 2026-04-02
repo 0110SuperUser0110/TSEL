@@ -1,0 +1,44 @@
+{
+  "start_time": "2026-03-15T12:10:00Z",
+  "sample_rate_hz": 4,
+  "source": "AUDIO-01",
+  "metadata": {
+    "dataset": "synthetic_auditory_episode",
+    "condition": "tone perception"
+  },
+  "channels": {
+    "loudness_left": [
+      0.2,
+      0.4,
+      0.8,
+      1.0,
+      0.6,
+      0.3
+    ],
+    "loudness_right": [
+      0.2,
+      0.35,
+      0.78,
+      0.96,
+      0.58,
+      0.28
+    ]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "tone_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 4,
+      "label": "tone_offset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 5,
+      "label": "auditory_report",
+      "marker_type": "behavior"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+"""Thin GUI viewer for the Temporal Sensory Encoding Layer."""

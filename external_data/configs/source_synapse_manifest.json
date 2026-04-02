@@ -1,0 +1,28 @@
+{
+  "jobs": [
+    {
+      "input": "../curated/dream_synapse_train_sample.tsv",
+      "config": "source_dream_synapse_train.json"
+    },
+    {
+      "input": "../curated/dream_synapse_leaderboard_individual_sample.tsv",
+      "config": "source_dream_synapse_individual.json"
+    },
+    {
+      "input": "../curated/dream_synapse_lbs1_individual_sample.tsv",
+      "config": "source_dream_synapse_individual.json"
+    },
+    {
+      "input": "../curated/dream_synapse_lbs2_aggregate_sample.tsv",
+      "config": "source_dream_synapse_aggregate.json"
+    },
+    {
+      "input": "../curated/dream_synapse_molecular_sample.tsv",
+      "config": "source_dream_synapse_molecular.json"
+    },
+    {
+      "input": "../curated/dream_synapse_split_registry.tsv",
+      "config": "source_dream_synapse_split_registry.json"
+    }
+  ]
+}

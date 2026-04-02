@@ -1,0 +1,37 @@
+{
+  "adapter": "timeseries_csv",
+  "delimiter": ",",
+  "timestamp": {
+    "column": "timestamp"
+  },
+  "modality": {
+    "value": "multisensory"
+  },
+  "source": {
+    "column": "rig_id"
+  },
+  "sample_rate": {
+    "value": 1.0,
+    "cast": "float"
+  },
+  "auto_channels": {
+    "exclude": [
+      "subject_id"
+    ],
+    "signal_type_strategy": "channel_name",
+    "default_unit": "a.u.",
+    "channel_units": {
+      "ambient_temp_c": "C",
+      "skin_conductance": "uS"
+    }
+  },
+  "context": {
+    "include": [
+      "subject_id"
+    ],
+    "static": {
+      "dataset": "synthetic_multisensory",
+      "encoding_profile": "universal_temporal_code"
+    }
+  }
+}

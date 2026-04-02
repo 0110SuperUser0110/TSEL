@@ -1,0 +1,16 @@
+{
+  "adapter": "edf",
+  "modality": "eeg",
+  "source_strategy": "file_name",
+  "default_signal_type": "voltage",
+  "signal_type_strategy": "literal",
+  "default_unit": "uV",
+  "include_channels": [
+    "EEG Fpz-Cz",
+    "EEG Pz-Oz"
+  ],
+  "max_duration_seconds": 10.0,
+  "context": {
+    "dataset": "Sleep-EDF Database Expanded"
+  }
+}

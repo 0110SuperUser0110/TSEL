@@ -1,0 +1,33 @@
+{
+  "adapter": "json",
+  "mapping": {
+    "timestamp": {
+      "column": "captured_at"
+    },
+    "modality": {
+      "value": "environment"
+    },
+    "source": {
+      "column": "station"
+    },
+    "signal_type": {
+      "column": "measurement"
+    },
+    "value": {
+      "column": "reading",
+      "cast": "float"
+    },
+    "unit": {
+      "column": "unit"
+    },
+    "context": {
+      "include": [
+        "phase"
+      ],
+      "static": {
+        "dataset": "synthetic_environment"
+      },
+      "capture_remaining": true
+    }
+  }
+}

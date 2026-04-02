@@ -1,0 +1,15 @@
+{
+  "adapter": "edf",
+  "modality": "eeg",
+  "source_strategy": "recording_id",
+  "default_signal_type": "voltage",
+  "signal_type_strategy": "literal",
+  "default_unit": "uV",
+  "context": {
+    "encoding_profile": "universal_temporal_code"
+  },
+  "include_header_context": true,
+  "emit_annotations": true,
+  "annotation_signal_type": "marker",
+  "annotation_unit": "event"
+}

@@ -1,0 +1,44 @@
+{
+  "start_time": "2026-03-15T12:00:00Z",
+  "sample_rate_hz": 4,
+  "source": "VISION-01",
+  "metadata": {
+    "dataset": "synthetic_visual_episode",
+    "condition": "visual cue tracking"
+  },
+  "channels": {
+    "pupil_left": [
+      3.1,
+      3.2,
+      3.6,
+      4.0,
+      3.7,
+      3.3
+    ],
+    "pupil_right": [
+      3.0,
+      3.1,
+      3.5,
+      3.9,
+      3.6,
+      3.2
+    ]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "light_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 4,
+      "label": "light_offset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 5,
+      "label": "visual_report",
+      "marker_type": "behavior"
+    }
+  ]
+}

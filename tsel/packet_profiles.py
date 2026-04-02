@@ -1,0 +1,415 @@
+﻿from __future__ import annotations
+
+import csv
+import hashlib
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+from .autorouting import AutoIngestPlan
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PACKET_CACHE_ROOT = ROOT / "output" / "_packet_cache"
+
+_SYNAPSE_REQUIRED_FILES = (
+    "CID_leaderboard.txt",
+    "CID_testset.txt",
+    "dilution_leaderboard.txt",
+    "dilution_testset.txt",
+    "LBs1.txt",
+    "LBs2.txt",
+    "leaderboard_set.txt",
+    "molecular_descriptors_data.txt",
+    "TrainSet.txt",
+)
+_SYNAPSE_OPTIONAL_FILES = ("train_set.mat",)
+
+
+def detect_special_packet_type(input_path: str | Path) -> str | None:
+    path = Path(input_path)
+    if not path.is_dir():
+        return None
+    members = {child.name for child in path.iterdir() if child.is_file()}
+    if all(name in members for name in _SYNAPSE_REQUIRED_FILES):
+        return "dream_synapse"
+    return None
+
+
+def describe_special_packet(input_path: str | Path) -> dict[str, Any] | None:
+    path = Path(input_path)
+    packet_type = detect_special_packet_type(path)
+    if packet_type != "dream_synapse":
+        return None
+
+    files = []
+    for name in (*_SYNAPSE_REQUIRED_FILES, *_SYNAPSE_OPTIONAL_FILES):
+        member = path / name
+        if not member.exists():
+            continue
+        files.append(
+            {
+                "path": name,
+                "profile": "olfaction",
+                "status": "packet member" if name in _SYNAPSE_REQUIRED_FILES else "provenance artifact",
+                "size_bytes": member.stat().st_size,
+            }
+        )
+
+    return {
+        "format": "packet",
+        "packet_type": packet_type,
+        "root": str(path.resolve()),
+        "file_count": len(files),
+        "preview_files": files,
+    }
+
+
+def plan_special_packet(input_path: str | Path, requested_profile: str) -> list[AutoIngestPlan] | None:
+    path = Path(input_path)
+    packet_type = detect_special_packet_type(path)
+    if packet_type != "dream_synapse":
+        return None
+    if requested_profile not in {"generic", "olfaction"}:
+        raise ValueError("This raw packet is olfactory challenge data. Select Smell / olfaction.")
+
+    cache_dir = _packet_cache_dir(path, packet_type)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    derived_files = _build_synapse_packet_files(path, cache_dir)
+    config = _packet_json_config()
+
+    return [
+        AutoIngestPlan(
+            input_path=derived_path,
+            sensory_profile="olfaction",
+            adapter="json",
+            rationale=rationale,
+            config=config,
+            detected_format="packet_jsonl",
+        )
+        for derived_path, rationale in derived_files
+    ]
+
+
+def _packet_cache_dir(packet_dir: Path, packet_type: str) -> Path:
+    digest = hashlib.sha1(str(packet_dir.resolve()).encode("utf-8")).hexdigest()[:12]
+    return PACKET_CACHE_ROOT / packet_type / digest
+
+
+def _packet_json_config() -> dict[str, Any]:
+    return {
+        "adapter": "json",
+        "mapping": {
+            "timestamp": {"column": "timestamp"},
+            "modality": {"column": "modality"},
+            "source": {"column": "source"},
+            "signal_type": {"column": "signal_type"},
+            "value": {"column": "value"},
+            "unit": {"column": "unit"},
+            "context": {
+                "capture_remaining": True,
+                "static": {
+                    "dataset": "DREAM Olfaction Prediction Challenge",
+                    "packet_profile": "dream_synapse",
+                    "ingest_mode": "packet_profile",
+                    "sensory_profile": "olfaction",
+                    "temporal_layer": "unified",
+                    "alignment": {"session_id": "dream_synapse"},
+                    "completeness": {
+                        "observation_status": "partial",
+                        "missing_dimensions": ["absolute_time"],
+                        "future_inference_allowed": True,
+                    },
+                    "sensory": {"primary_sense": "olfaction"},
+                    "acquisition": {
+                        "acquisition_profile": "olfaction",
+                        "instrument": "dream_synapse_packet",
+                        "device_class": "record_stream",
+                        "transform_stage": "normalized",
+                    },
+                },
+            },
+            "temporal": {
+                "event_kind": {"column": "event_kind"},
+                "stream_id": {"column": "stream_id"},
+                "sequence_index": {"column": "sequence_index", "cast": "int"},
+                "time_scale": {"value": "second"},
+            },
+        },
+    }
+
+
+def _build_synapse_packet_files(raw_dir: Path, cache_dir: Path) -> list[tuple[Path, str]]:
+    derived_files: list[tuple[Path, str]] = []
+
+    train_path = cache_dir / "synapse_train_profiles.jsonl"
+    _write_jsonl(train_path, _iter_train_records(raw_dir / "TrainSet.txt"))
+    derived_files.append((train_path, "Prepared train-set olfactory perception profiles from the raw DREAM Synapse packet."))
+
+    leaderboard_path = cache_dir / "synapse_leaderboard_individual.jsonl"
+    _write_jsonl(
+        leaderboard_path,
+        _iter_individual_records(raw_dir / "leaderboard_set.txt", split_name="leaderboard_set", origin=datetime(2015, 6, 2, tzinfo=timezone.utc)),
+    )
+    derived_files.append((leaderboard_path, "Prepared leaderboard individual olfactory observations from the raw DREAM Synapse packet."))
+
+    lbs1_path = cache_dir / "synapse_lbs1_individual.jsonl"
+    _write_jsonl(
+        lbs1_path,
+        _iter_individual_records(raw_dir / "LBs1.txt", split_name="LBs1", origin=datetime(2015, 6, 3, tzinfo=timezone.utc)),
+    )
+    derived_files.append((lbs1_path, "Prepared LBs1 individual olfactory observations from the raw DREAM Synapse packet."))
+
+    aggregate_path = cache_dir / "synapse_lbs2_aggregate.jsonl"
+    _write_jsonl(aggregate_path, _iter_aggregate_records(raw_dir / "LBs2.txt"))
+    derived_files.append((aggregate_path, "Prepared LBs2 aggregate olfactory observations from the raw DREAM Synapse packet."))
+
+    molecular_path = cache_dir / "synapse_molecular_vectors.jsonl"
+    _write_jsonl(molecular_path, _iter_molecular_records(raw_dir / "molecular_descriptors_data.txt"))
+    derived_files.append((molecular_path, "Prepared compact molecular descriptor vectors from the raw DREAM Synapse packet."))
+
+    split_path = cache_dir / "synapse_split_registry.jsonl"
+    _write_jsonl(
+        split_path,
+        _iter_split_registry_records(
+            raw_dir / "CID_leaderboard.txt",
+            raw_dir / "CID_testset.txt",
+            raw_dir / "dilution_leaderboard.txt",
+            raw_dir / "dilution_testset.txt",
+        ),
+    )
+    derived_files.append((split_path, "Prepared challenge split membership markers from the raw DREAM Synapse packet."))
+
+    return derived_files
+
+
+def _write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        for record in records:
+            handle.write(json.dumps(record, ensure_ascii=True))
+            handle.write("\n")
+
+
+def _iter_train_records(path: Path) -> list[dict[str, Any]]:
+    origin = datetime(2015, 6, 1, tzinfo=timezone.utc)
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        if reader.fieldnames is None:
+            raise ValueError("TrainSet.txt does not contain a header row")
+        descriptor_columns = [
+            field
+            for field in reader.fieldnames
+            if field not in {"Compound Identifier", "Odor", "Replicate", "Intensity", "Dilution", "subject #"}
+        ]
+        for sequence_index, row in enumerate(reader):
+            profile = {
+                column: numeric_value
+                for column in descriptor_columns
+                if (numeric_value := _clean_numeric_value(row.get(column))) is not None
+            }
+            subject_id = _clean_text(row.get("subject #")) or "unknown"
+            source = f"synapse-subject-{subject_id}"
+            records.append(
+                {
+                    "timestamp": _iso_timestamp(origin, sequence_index),
+                    "modality": "olfaction_perception",
+                    "source": source,
+                    "signal_type": "perception_profile",
+                    "value": profile,
+                    "unit": "rating_vector",
+                    "event_kind": "observation",
+                    "sequence_index": sequence_index,
+                    "stream_id": source,
+                    "source_table": path.name,
+                    "challenge_partition": "train",
+                    "compound_id": _clean_text(row.get("Compound Identifier")),
+                    "odor_name": _clean_text(row.get("Odor")),
+                    "replicate_label": _clean_text(row.get("Replicate")),
+                    "intensity_label": _clean_text(row.get("Intensity")),
+                    "dilution": _clean_text(row.get("Dilution")),
+                    "vector_dimensions": len(profile),
+                }
+            )
+    return records
+
+
+def _iter_individual_records(path: Path, *, split_name: str, origin: datetime) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for sequence_index, row in enumerate(reader):
+            compound_key = "#oID" if "#oID" in row else "oID"
+            individual = _clean_text(row.get("individual")) or "unknown"
+            source = f"synapse-individual-{individual}"
+            records.append(
+                {
+                    "timestamp": _iso_timestamp(origin, sequence_index),
+                    "modality": "olfaction_perception",
+                    "source": source,
+                    "signal_type": _clean_text(row.get("descriptor")) or "descriptor",
+                    "value": _clean_numeric_value(row.get("value")),
+                    "unit": "rating",
+                    "event_kind": "observation",
+                    "sequence_index": sequence_index,
+                    "stream_id": source,
+                    "source_table": path.name,
+                    "challenge_split": split_name,
+                    "compound_id": _clean_text(row.get(compound_key)),
+                }
+            )
+    return records
+
+
+def _iter_aggregate_records(path: Path) -> list[dict[str, Any]]:
+    origin = datetime(2015, 6, 4, tzinfo=timezone.utc)
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        for sequence_index, row in enumerate(reader):
+            compound_key = "#oID" if "#oID" in row else "oID"
+            compound_id = _clean_text(row.get(compound_key)) or "unknown"
+            records.append(
+                {
+                    "timestamp": _iso_timestamp(origin, sequence_index),
+                    "modality": "olfaction_aggregate",
+                    "source": compound_id,
+                    "signal_type": _clean_text(row.get("descriptor")) or "descriptor",
+                    "value": _clean_numeric_value(row.get("value")),
+                    "unit": "rating",
+                    "event_kind": "observation",
+                    "sequence_index": sequence_index,
+                    "stream_id": compound_id,
+                    "source_table": path.name,
+                    "challenge_split": "LBs2",
+                    "sigma": _clean_numeric_value(row.get("sigma")),
+                    "compound_id": compound_id,
+                }
+            )
+    return records
+
+
+def _iter_molecular_records(path: Path) -> list[dict[str, Any]]:
+    origin = datetime(2015, 6, 5, tzinfo=timezone.utc)
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.reader(handle, delimiter="\t")
+        header = next(reader, None)
+        if header is None:
+            raise ValueError("molecular_descriptors_data.txt does not contain a header row")
+        descriptor_columns = _make_unique_columns(header[1:])
+        for sequence_index, row in enumerate(reader):
+            compound_id = _clean_text(row[0]) or f"compound-{sequence_index}"
+            descriptors = {
+                column: numeric_value
+                for column, value in zip(descriptor_columns, row[1:])
+                if (numeric_value := _clean_numeric_value(value)) is not None
+            }
+            records.append(
+                {
+                    "timestamp": _iso_timestamp(origin, sequence_index),
+                    "modality": "molecular_descriptor",
+                    "source": compound_id,
+                    "signal_type": "descriptor_vector",
+                    "value": descriptors,
+                    "unit": "a.u._vector",
+                    "event_kind": "observation",
+                    "sequence_index": sequence_index,
+                    "stream_id": compound_id,
+                    "source_table": path.name,
+                    "challenge_partition": "molecular_descriptors",
+                    "compound_id": compound_id,
+                    "vector_dimensions": len(descriptors),
+                    "duplicate_header_resolved": True,
+                }
+            )
+    return records
+
+
+def _iter_split_registry_records(
+    cid_leaderboard_path: Path,
+    cid_test_path: Path,
+    dilution_leaderboard_path: Path,
+    dilution_test_path: Path,
+) -> list[dict[str, Any]]:
+    origin = datetime(2015, 6, 6, tzinfo=timezone.utc)
+    records: list[dict[str, Any]] = []
+    for partition, cid_path, dilution_path in (
+        ("leaderboard", cid_leaderboard_path, dilution_leaderboard_path),
+        ("test", cid_test_path, dilution_test_path),
+    ):
+        dilution_map = _read_dilution_map(dilution_path)
+        for compound_id in _read_id_list(cid_path):
+            records.append(
+                {
+                    "timestamp": _iso_timestamp(origin, len(records)),
+                    "modality": "olfaction_challenge_split",
+                    "source": compound_id,
+                    "signal_type": "challenge_membership",
+                    "value": partition,
+                    "unit": "label",
+                    "event_kind": "marker",
+                    "sequence_index": len(records),
+                    "stream_id": compound_id,
+                    "source_table": cid_path.name,
+                    "challenge_partition": partition,
+                    "dilution": dilution_map.get(compound_id, ""),
+                    "compound_id": compound_id,
+                }
+            )
+    return records
+
+
+def _read_id_list(path: Path) -> list[str]:
+    values: list[str] = []
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        for line in handle:
+            value = _clean_text(line)
+            if not value or value.lower() in {"oid", "cid", "#oid"}:
+                continue
+            values.append(value)
+    return values
+
+
+def _read_dilution_map(path: Path) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle, delimiter="\t")
+        compound_key = "oID" if reader.fieldnames and "oID" in reader.fieldnames else "#oID"
+        for row in reader:
+            mapping[_clean_text(row.get(compound_key))] = _clean_text(row.get("dilution"))
+    return mapping
+
+
+def _make_unique_columns(columns: list[str]) -> list[str]:
+    counts: dict[str, int] = {}
+    unique: list[str] = []
+    for column in columns:
+        name = _clean_text(column) or "unnamed"
+        counts[name] = counts.get(name, 0) + 1
+        if counts[name] == 1:
+            unique.append(name)
+        else:
+            unique.append(f"{name}__{counts[name]}")
+    return unique
+
+
+def _clean_text(value: object) -> str:
+    text = str(value or "").strip()
+    text = text.strip('"').strip("'").strip()
+    if text in {"NaN", "nan", "None"}:
+        return ""
+    return text
+
+
+def _clean_numeric_value(value: object) -> float | None:
+    text = _clean_text(value)
+    if not text:
+        return None
+    return float(text)
+
+
+def _iso_timestamp(origin: datetime, offset_seconds: int) -> str:
+    return (origin + timedelta(seconds=offset_seconds)).isoformat().replace("+00:00", "Z")
+

@@ -1,0 +1,332 @@
+{
+  "spec_version": "1.0.0",
+  "modalities": [
+    "dream",
+    "eeg",
+    "environment",
+    "multisensory",
+    "molecular_descriptor",
+    "olfaction",
+    "olfaction_aggregate",
+    "olfaction_challenge_split",
+    "olfaction_perception",
+    "sleep_stage"
+  ],
+  "event_kinds": [
+    "aggregate",
+    "episode",
+    "marker",
+    "observation",
+    "report",
+    "sample",
+    "transition",
+    "window"
+  ],
+  "signal_types": [
+    "marker",
+    "measurement",
+    "state",
+    "status",
+    "text",
+    "voltage"
+  ],
+  "time_scales": [
+    "sample",
+    "millisecond",
+    "second",
+    "minute",
+    "hour",
+    "session",
+    "day",
+    "epoch",
+    "experiment"
+  ],
+  "observation_statuses": [
+    "observed",
+    "partial",
+    "missing",
+    "inferred",
+    "imputed",
+    "derived"
+  ],
+  "continuity_states": [
+    "continuous",
+    "interrupted",
+    "fragmented",
+    "reconstructed",
+    "unknown"
+  ],
+  "primary_senses": [
+    "vision",
+    "audition",
+    "olfaction",
+    "gustation",
+    "somatosensation"
+  ],
+  "laterality": [
+    "left",
+    "right",
+    "midline",
+    "bilateral",
+    "diffuse",
+    "unknown"
+  ],
+  "trajectory_roles": [
+    "baseline",
+    "stimulus",
+    "response",
+    "report",
+    "context",
+    "aftereffect"
+  ],
+  "delivery_states": [
+    "prepared",
+    "presented",
+    "active",
+    "maintained",
+    "removed",
+    "residual",
+    "reported",
+    "unknown"
+  ],
+  "relation_types": [
+    "part_of",
+    "precedes",
+    "follows",
+    "overlaps",
+    "caused_by",
+    "evoked_by",
+    "reported_by",
+    "synchronized_with",
+    "measured_by",
+    "belongs_to",
+    "describes"
+  ],
+  "transform_stages": [
+    "raw",
+    "normalized",
+    "segmented",
+    "derived",
+    "inferred",
+    "annotated"
+  ],
+  "experience_phases": [
+    "baseline",
+    "anticipation",
+    "onset",
+    "rise",
+    "peak",
+    "sustain",
+    "decay",
+    "offset",
+    "aftereffect",
+    "report",
+    "recovery"
+  ],
+  "units": [
+    "C",
+    "Hz",
+    "V",
+    "a.u.",
+    "event",
+    "index",
+    "label",
+    "m/s",
+    "ppm",
+    "ppb",
+    "score",
+    "stage",
+    "text",
+    "uS",
+    "uV"
+  ],
+  "alignment_keys": [
+    "source_id",
+    "session_id",
+    "recording_id",
+    "subject_id",
+    "trial_id",
+    "device_id"
+  ],
+  "sensory_profiles": {
+    "generic": {
+      "label": "Generic",
+      "description": "Modality-agnostic sensory ingestion routed into the unified temporal layer.",
+      "modalities": [],
+      "adapters": [
+        "csv",
+        "json",
+        "timeseries_csv",
+        "timeseries_json",
+        "edf"
+      ]
+    },
+    "eeg": {
+      "label": "EEG",
+      "description": "Electrical brain activity, sleep-stage annotations, and related recording streams.",
+      "modalities": [
+        "eeg",
+        "sleep_stage"
+      ],
+      "adapters": [
+        "csv",
+        "json",
+        "timeseries_csv",
+        "timeseries_json",
+        "edf"
+      ]
+    },
+    "olfaction": {
+      "label": "Olfaction",
+      "description": "Chemical sensing, odor presentation, and olfactory perception records.",
+      "modalities": [
+        "olfaction",
+        "olfaction_aggregate",
+        "olfaction_challenge_split",
+        "olfaction_perception",
+        "molecular_descriptor"
+      ],
+      "adapters": [
+        "csv",
+        "json",
+        "timeseries_csv",
+        "timeseries_json"
+      ]
+    },
+    "dream": {
+      "label": "Dream",
+      "description": "Dream reports and related narrative sleep-state data.",
+      "modalities": [
+        "dream"
+      ],
+      "adapters": [
+        "csv",
+        "json"
+      ]
+    },
+    "environment": {
+      "label": "Environment",
+      "description": "Environmental or apparatus-state measurements synchronized to experimental time.",
+      "modalities": [
+        "environment"
+      ],
+      "adapters": [
+        "csv",
+        "json",
+        "timeseries_csv",
+        "timeseries_json"
+      ]
+    },
+    "multisensory": {
+      "label": "Multisensory",
+      "description": "Cross-modal or mixed sensor matrices aligned inside one temporal envelope.",
+      "modalities": [
+        "multisensory"
+      ],
+      "adapters": [
+        "csv",
+        "json",
+        "timeseries_csv",
+        "timeseries_json",
+        "edf"
+      ]
+    }
+  },
+  "aliases": {
+    "modalities": {
+      "electroencephalography": "eeg",
+      "gas_sensor": "olfaction",
+      "gas-sensor": "olfaction",
+      "molecular": "molecular_descriptor",
+      "sleep-stage": "sleep_stage"
+    },
+    "event_kinds": {
+      "annotation": "marker",
+      "annotations": "marker",
+      "interval": "window",
+      "state_change": "transition"
+    },
+    "signal_types": {
+      "annotation": "marker",
+      "annotations": "marker",
+      "sleep stage": "sleep_stage",
+      "sleep-stage": "sleep_stage",
+      "text_report": "text"
+    },
+    "units": {
+      "au": "a.u.",
+      "celsius": "C",
+      "deg_c": "C",
+      "microvolt": "uV",
+      "microvolts": "uV",
+      "microsiemens": "uS",
+      "uv": "uV",
+      "\u00b5v": "uV",
+      "\u03bcv": "uV"
+    },
+    "phases": {
+      "pre_exposure": "anticipation",
+      "pre-exposure": "anticipation",
+      "start": "onset",
+      "begin": "onset",
+      "rising": "rise",
+      "max": "peak",
+      "plateau": "sustain",
+      "wane": "decay",
+      "waning": "decay",
+      "end": "offset",
+      "post_exposure": "aftereffect",
+      "post-exposure": "aftereffect"
+    },
+    "primary_senses": {
+      "sight": "vision",
+      "visual": "vision",
+      "hearing": "audition",
+      "audio": "audition",
+      "sound": "audition",
+      "smell": "olfaction",
+      "olfactory": "olfaction",
+      "taste": "gustation",
+      "gustatory": "gustation",
+      "touch": "somatosensation",
+      "tactile": "somatosensation",
+      "somatic": "somatosensation"
+    },
+    "laterality": {
+      "both": "bilateral",
+      "center": "midline",
+      "centre": "midline",
+      "central": "midline"
+    },
+    "trajectory_roles": {
+      "stimulus_window": "stimulus",
+      "post_effect": "aftereffect",
+      "posteffect": "aftereffect"
+    },
+    "delivery_states": {
+      "on": "active",
+      "off": "removed",
+      "present": "presented",
+      "presentation": "presented",
+      "maintain": "maintained",
+      "post": "residual"
+    },
+    "relation_types": {
+      "partof": "part_of",
+      "synced_with": "synchronized_with",
+      "sync_with": "synchronized_with",
+      "described_by": "reported_by"
+    },
+    "transform_stages": {
+      "normalised": "normalized"
+    },
+    "sensory_profiles": {
+      "ecog": "eeg",
+      "electroencephalography": "eeg",
+      "gas_sensor": "olfaction",
+      "gas-sensor": "olfaction",
+      "odor": "olfaction",
+      "sleep": "eeg"
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "start_time": "2026-03-15T12:30:00Z",
+  "sample_rate_hz": 4,
+  "source": "TASTE-01",
+  "metadata": {
+    "dataset": "synthetic_gustatory_episode",
+    "condition": "taste delivery"
+  },
+  "channels": {
+    "taste_intensity": [
+      0.0,
+      0.2,
+      0.7,
+      0.95,
+      0.55,
+      0.15
+    ],
+    "salivation_index": [
+      0.1,
+      0.16,
+      0.3,
+      0.42,
+      0.28,
+      0.14
+    ]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "taste_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 4,
+      "label": "taste_offset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 5,
+      "label": "taste_report",
+      "marker_type": "behavior"
+    }
+  ]
+}

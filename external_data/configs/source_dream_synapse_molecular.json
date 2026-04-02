@@ -1,0 +1,20 @@
+{
+  "adapter": "timeseries_csv",
+  "delimiter": "\t",
+  "timestamp": { "column": "timestamp" },
+  "modality": { "value": "molecular_descriptor" },
+  "source": { "column": "compound_id" },
+  "sample_rate": { "value": 1.0, "cast": "float" },
+  "auto_channels": {
+    "signal_type_strategy": "channel_name",
+    "default_unit": "a.u.",
+    "cast": "float"
+  },
+  "context": {
+    "static": {
+      "dataset": "DREAM Olfaction Prediction Challenge",
+      "challenge_partition": "molecular_descriptors",
+      "temporal_basis": "synthetic_sequence"
+    }
+  }
+}

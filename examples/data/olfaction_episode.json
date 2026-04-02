@@ -1,0 +1,44 @@
+{
+  "start_time": "2026-03-15T12:20:00Z",
+  "sample_rate_hz": 4,
+  "source": "SMELL-01",
+  "metadata": {
+    "dataset": "synthetic_olfactory_episode",
+    "condition": "odor perception"
+  },
+  "channels": {
+    "odor_intensity_a": [
+      0.1,
+      0.3,
+      0.8,
+      1.1,
+      0.7,
+      0.25
+    ],
+    "odor_intensity_b": [
+      0.1,
+      0.28,
+      0.75,
+      1.0,
+      0.68,
+      0.22
+    ]
+  },
+  "annotations": [
+    {
+      "offset_samples": 1,
+      "label": "odor_onset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 4,
+      "label": "odor_offset",
+      "marker_type": "stimulus"
+    },
+    {
+      "offset_samples": 5,
+      "label": "olfactory_report",
+      "marker_type": "behavior"
+    }
+  ]
+}

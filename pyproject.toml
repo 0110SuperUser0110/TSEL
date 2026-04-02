@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tsel-prototype"
+version = "1.0.0"
+description = "Temporal Sensory Encoding Layer for dynamic sensory data"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+tsel = "tsel.cli:main"
+
+[project.gui-scripts]
+tsel-viewer = "viewer.app:main"
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider -p no:tmpdir"
+testpaths = ["tests"]

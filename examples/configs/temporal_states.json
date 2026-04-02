@@ -1,0 +1,60 @@
+{
+  "adapter": "csv",
+  "delimiter": ",",
+  "mapping": {
+    "timestamp": {
+      "column": "timestamp"
+    },
+    "modality": {
+      "value": "olfaction"
+    },
+    "source": {
+      "column": "lab_id"
+    },
+    "signal_type": {
+      "column": "signal"
+    },
+    "value": {
+      "column": "value"
+    },
+    "unit": {
+      "value": "event"
+    },
+    "context": {
+      "static": {
+        "dataset": "temporal_semantics_demo"
+      }
+    },
+    "temporal": {
+      "event_kind": {
+        "column": "kind"
+      },
+      "end": {
+        "column": "end_ts"
+      },
+      "confidence": {
+        "column": "confidence",
+        "cast": "float"
+      },
+      "time_scale": {
+        "column": "time_scale"
+      },
+      "phase": {
+        "column": "phase"
+      },
+      "episode_id": {
+        "column": "episode_id"
+      },
+      "window_id": {
+        "column": "window_id"
+      },
+      "transition_from": {
+        "column": "from_state"
+      },
+      "transition_to": {
+        "column": "to_state"
+      },
+      "anchor": "start"
+    }
+  }
+}

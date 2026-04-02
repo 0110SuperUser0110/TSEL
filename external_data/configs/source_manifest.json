@@ -1,0 +1,20 @@
+{
+  "jobs": [
+    {
+      "input": "../curated/olfactory_gas_batch1_sample.csv",
+      "config": "source_olfactory_gas.json"
+    },
+    {
+      "input": "../curated/dream_reports_sample.csv",
+      "config": "source_dream_reports.json"
+    },
+    {
+      "input": "../raw/SC4401E0-PSG.edf",
+      "config": "source_sleep_edf.json"
+    },
+    {
+      "input": "../raw/SC4401EC-Hypnogram.edf",
+      "config": "source_sleep_hypnogram.json"
+    }
+  ]
+}

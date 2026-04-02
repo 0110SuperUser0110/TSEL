@@ -1,0 +1,427 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tsel.dev/schema/tsel-event-1.0.0.json",
+  "title": "TSEL Event",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "modality",
+    "source",
+    "signal_type",
+    "value",
+    "unit",
+    "contextual_metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "modality": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "signal_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {},
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contextual_metadata": {
+      "type": "object",
+      "properties": {
+        "alignment": {
+          "type": "object",
+          "properties": {
+            "source_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "session_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "recording_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "subject_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "trial_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "device_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "completeness": {
+          "type": "object",
+          "properties": {
+            "observation_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "completeness_score": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "missing_dimensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "inferred_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "future_inference_allowed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "experience": {
+          "type": "object",
+          "properties": {
+            "experience_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "continuity_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "continuity_index": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "continuity_state": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "sensory": {
+          "type": "object",
+          "properties": {
+            "primary_sense": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "submodality": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "body_site": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "laterality": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "receptor_pathway": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "trajectory_role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "acquisition": {
+          "type": "object",
+          "properties": {
+            "acquisition_profile": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "device_class": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "instrument": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "channel": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sample_rate_hz": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "transform_stage": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "stimulus": {
+          "type": "object",
+          "properties": {
+            "stimulus_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stimulus_label": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "stimulus_object": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "presentation_phase": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "delivery_state": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "intensity_estimate": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "intensity_unit": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "additionalProperties": true
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "relation_type",
+              "target_id"
+            ],
+            "properties": {
+              "relation_type": {
+                "type": "string"
+              },
+              "target_id": {
+                "type": "string"
+              },
+              "target_type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "confidence": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0.0,
+                "maximum": 1.0
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "temporal": {
+          "type": "object",
+          "required": [
+            "start",
+            "anchor",
+            "event_kind",
+            "stream_id",
+            "schema_version"
+          ],
+          "properties": {
+            "start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "anchor": {
+              "type": "string"
+            },
+            "duration_seconds": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "resolution_seconds": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "uncertainty_seconds": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "time_scale": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "event_kind": {
+              "type": "string"
+            },
+            "stream_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sequence_index": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "confidence": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "phase": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sync_group": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "window_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "episode_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "transition_from": {},
+            "transition_to": {},
+            "schema_version": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

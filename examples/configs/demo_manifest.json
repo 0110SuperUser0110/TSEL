@@ -1,0 +1,29 @@
+{
+  "jobs": [
+    {
+      "input": "../data/olfaction_trials.csv",
+      "config": "olfaction.json",
+      "profile": "olfaction"
+    },
+    {
+      "input": "../data/environment_events.json",
+      "config": "environment.json",
+      "profile": "environment"
+    },
+    {
+      "input": "../data/eeg_timeseries.csv",
+      "config": "eeg_timeseries.json",
+      "profile": "eeg"
+    },
+    {
+      "input": "../data/eeg_direct.json",
+      "config": "eeg_direct.json",
+      "profile": "eeg"
+    },
+    {
+      "input": "../data/multisensory_matrix.csv",
+      "config": "multisensory_matrix.json",
+      "profile": "multisensory"
+    }
+  ]
+}

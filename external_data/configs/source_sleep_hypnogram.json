@@ -1,0 +1,13 @@
+{
+  "adapter": "edf",
+  "modality": "sleep_stage",
+  "source_strategy": "file_name",
+  "default_signal_type": "sleep_stage",
+  "signal_type_strategy": "literal",
+  "annotation_signal_type": "sleep_stage",
+  "annotation_unit": "stage",
+  "max_duration_seconds": 43200.0,
+  "context": {
+    "dataset": "Sleep-EDF Database Expanded"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "adapter": "timeseries_json",
+  "modality": "eeg",
+  "source_field": "source",
+  "start_time_field": "start_time",
+  "sample_rate_field": "sample_rate_hz",
+  "metadata_field": "metadata",
+  "channels_field": "channels",
+  "annotations_field": "annotations",
+  "default_signal_type": "voltage",
+  "signal_type_strategy": "literal",
+  "default_unit": "uV",
+  "channel_context": {
+    "Fp1": {
+      "hemisphere": "left-frontal"
+    },
+    "Fp2": {
+      "hemisphere": "right-frontal"
+    }
+  },
+  "context": {
+    "encoding_profile": "universal_temporal_code"
+  },
+  "annotation_signal_type": "marker",
+  "annotation_unit": "event"
+}

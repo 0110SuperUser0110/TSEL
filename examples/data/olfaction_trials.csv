@@ -1,0 +1,4 @@
+elapsed_ms,sensor_id,odorant,intensity_ppm,trial_id,temperature_c,humidity_pct
+0,sensor-alpha,limonene,1.2,T-001,21.7,45.1
+150,sensor-alpha,limonene,1.8,T-001,21.7,45.3
+300,sensor-beta,geosmin,0.4,T-002,21.4,46.0

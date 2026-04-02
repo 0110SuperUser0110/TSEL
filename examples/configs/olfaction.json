@@ -1,0 +1,37 @@
+{
+  "adapter": "csv",
+  "delimiter": ",",
+  "mapping": {
+    "timestamp": {
+      "column": "elapsed_ms",
+      "origin": "2026-03-15T14:00:00Z",
+      "unit": "milliseconds"
+    },
+    "modality": {
+      "value": "olfaction"
+    },
+    "source": {
+      "column": "sensor_id"
+    },
+    "signal_type": {
+      "column": "odorant"
+    },
+    "value": {
+      "column": "intensity_ppm",
+      "cast": "float"
+    },
+    "unit": {
+      "value": "ppm"
+    },
+    "context": {
+      "include": [
+        "trial_id",
+        "temperature_c"
+      ],
+      "static": {
+        "dataset": "synthetic_olfaction"
+      },
+      "capture_remaining": true
+    }
+  }
+}

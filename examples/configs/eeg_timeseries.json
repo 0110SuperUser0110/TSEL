@@ -1,0 +1,39 @@
+{
+  "adapter": "timeseries_csv",
+  "delimiter": ",",
+  "timestamp": {
+    "column": "timestamp"
+  },
+  "modality": {
+    "value": "eeg"
+  },
+  "source": {
+    "column": "session_id"
+  },
+  "sample_rate": {
+    "value": 1.0,
+    "cast": "float"
+  },
+  "context": {
+    "include": [
+      "task"
+    ],
+    "static": {
+      "dataset": "synthetic_eeg"
+    }
+  },
+  "channels": {
+    "Fz": {
+      "signal_type": "voltage",
+      "unit": "uV"
+    },
+    "Cz": {
+      "signal_type": "voltage",
+      "unit": "uV"
+    },
+    "Pz": {
+      "signal_type": "voltage",
+      "unit": "uV"
+    }
+  }
+}
