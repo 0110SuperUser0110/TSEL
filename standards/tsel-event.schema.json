@@ -280,6 +280,54 @@
           },
           "additionalProperties": true
         },
+        "domain_profile": {
+          "type": "object",
+          "properties": {
+            "domain": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "profile_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "profile_version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "resolution_status": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "evidence_signatures": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "candidate_profiles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "missing_metadata": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
         "relations": {
           "type": "array",
           "items": {

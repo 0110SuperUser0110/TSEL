@@ -342,6 +342,46 @@ def _standardize_relations_context(raw_context: Any) -> list[JSONValue] | None:
     return normalized_relations or None
 
 
+def _standardize_domain_profile_context(raw_context: Any) -> dict[str, JSONValue] | None:
+    if raw_context is None:
+        return None
+    if not isinstance(raw_context, dict):
+        raise TypeError("contextual_metadata.domain_profile must be a dictionary")
+
+    normalized: dict[str, JSONValue] = {}
+    domain = raw_context.get("domain")
+    if domain is not None:
+        if not isinstance(domain, str) or not domain.strip():
+            raise TypeError("contextual_metadata.domain_profile.domain must be a non-empty string when provided")
+        normalized["domain"] = _canonical_token(domain)
+
+    profile_id = raw_context.get("profile_id")
+    if profile_id is not None:
+        if not isinstance(profile_id, str) or not profile_id.strip():
+            raise TypeError("contextual_metadata.domain_profile.profile_id must be a non-empty string when provided")
+        normalized["profile_id"] = _canonical_token(profile_id)
+
+    profile_version = raw_context.get("profile_version")
+    if profile_version is not None:
+        if not isinstance(profile_version, str) or not profile_version.strip():
+            raise TypeError("contextual_metadata.domain_profile.profile_version must be a non-empty string when provided")
+        normalized["profile_version"] = profile_version.strip()
+
+    resolution_status = raw_context.get("resolution_status")
+    if resolution_status is not None:
+        normalized_status = _canonical_token(str(resolution_status))
+        if normalized_status not in {"resolved", "partial", "ambiguous", "unresolved"}:
+            raise ValueError(f"unsupported domain_profile resolution_status: {resolution_status}")
+        normalized["resolution_status"] = normalized_status
+
+    for field_name in ("evidence_signatures", "candidate_profiles", "missing_metadata"):
+        values = _normalized_string_list(raw_context.get(field_name), f"contextual_metadata.domain_profile.{field_name}")
+        if values:
+            normalized[field_name] = values
+
+    return normalized or None
+
+
 def _standardize_contextual_metadata(contextual_metadata: dict[str, JSONValue], source: str) -> dict[str, JSONValue]:
     from .standards import CORE_ALIGNMENT_KEYS
 
@@ -408,6 +448,12 @@ def _standardize_contextual_metadata(contextual_metadata: dict[str, JSONValue], 
         normalized["relations"] = relations
     else:
         normalized.pop("relations", None)
+
+    domain_profile = _standardize_domain_profile_context(normalized.get("domain_profile"))
+    if domain_profile is not None:
+        normalized["domain_profile"] = domain_profile
+    else:
+        normalized.pop("domain_profile", None)
 
     assertion_basis = _standardize_string_mapping(
         normalized.get("assertion_basis"),
@@ -1258,6 +1304,28 @@ class TemporalEventCollection:
                                 stream_id=event.stream_id,
                             )
                         )
+            domain_profile = event.contextual_metadata.get("domain_profile")
+            if isinstance(domain_profile, dict):
+                if domain_profile.get("profile_id") is not None and assertion_basis.get("domain_profile.profile_id") is None:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            code="missing_domain_profile_basis",
+                            message="domain_profile.profile_id should declare assertion_basis.domain_profile.profile_id",
+                            event_index=index,
+                            stream_id=event.stream_id,
+                        )
+                    )
+                if domain_profile.get("resolution_status") is not None and assertion_basis.get("domain_profile.resolution_status") is None:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            code="missing_domain_profile_basis",
+                            message="domain_profile.resolution_status should declare assertion_basis.domain_profile.resolution_status",
+                            event_index=index,
+                            stream_id=event.stream_id,
+                        )
+                    )
             relations = event.contextual_metadata.get("relations")
             if isinstance(relations, list) and relations and assertion_basis.get("relations") is None:
                 issues.append(
@@ -1579,6 +1647,9 @@ class TemporalEventCollection:
             if limit is not None and len(segments) >= limit:
                 break
         return segments
+
+
+
 
 
 

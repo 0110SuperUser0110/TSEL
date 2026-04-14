@@ -68,6 +68,17 @@ def _resolve_timeseries_csv_timestamp(mapping: TimeSeriesMapping, row: dict[str,
     return coerce_timestamp(raw_timestamp, origin=mapping.timestamp.origin, unit=mapping.timestamp.unit)
 
 
+def _source_basis_from_metadata(metadata: dict[str, JSONValue]) -> dict[str, str]:
+    basis: dict[str, str] = {}
+    for key, value in metadata.items():
+        if isinstance(value, dict):
+            for nested_key in value.keys():
+                basis[f"{key}.{nested_key}"] = "source_provided"
+        else:
+            basis[str(key)] = "source_provided"
+    return basis
+
+
 class CsvAdapter:
     def __init__(self, mapping: RecordMapping, *, delimiter: str = ",") -> None:
         self.mapping = mapping
@@ -229,6 +240,12 @@ class TimeSeriesJsonAdapter:
 
         base_context: dict[str, JSONValue] = dict(self.config.context)
         base_context.update(metadata)
+        source_basis = _source_basis_from_metadata(metadata)
+        if source_basis:
+            existing_basis = base_context.get("assertion_basis")
+            merged_basis = dict(existing_basis) if isinstance(existing_basis, dict) else {}
+            merged_basis.update(source_basis)
+            base_context["assertion_basis"] = merged_basis
         base_context["provenance"] = {"adapter": "timeseries_json", "file": path.name}
         if sample_rate_hz is not None:
             base_context["sample_rate_hz"] = sample_rate_hz

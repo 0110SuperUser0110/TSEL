@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from .adapters import CsvAdapter, EdfAdapter, JsonAdapter, TimeSeriesCsvAdapter, TimeSeriesJsonAdapter
-from .autorouting import AutoIngestPlan, build_auto_ingest_plan, looks_like_normalized_tsel
+from .autorouting import AutoIngestPlan, _read_json, _read_table, build_auto_ingest_plan, looks_like_normalized_tsel
+from .eeg_profiles import merge_eeg_domain_profile_into_config, resolve_eeg_edf_profile, resolve_eeg_json_profile, resolve_eeg_table_profile
+from .olfactory_profiles import merge_domain_profile_into_config, resolve_olfactory_json_profile, resolve_olfactory_table_profile
 from .config import EdfConfig, RecordMapping, TimeSeriesJsonConfig, TimeSeriesMapping
 from .experience import enrich_experience
 from .models import TemporalEventCollection
@@ -39,6 +41,7 @@ class TSELPipeline:
         active_profile = normalize_sensory_profile(
             sensory_profile or str(config_data.get("sensory_profile") or infer_sensory_profile(config_data))
         )
+        config_data = self._apply_domain_profile_layer(input_path, config_data, active_profile)
         validate_sensory_profile(config_data, active_profile)
         collection = self._ingest_with_config(input_path, config_data)
         return enrich_experience(collection, strict=self.strict_mode)
@@ -130,6 +133,38 @@ class TSELPipeline:
     def infer_sensory_profile(self, config: dict[str, Any] | str | Path) -> str:
         return infer_sensory_profile(self._load_config(config))
 
+    def _apply_domain_profile_layer(self, input_path: str | Path, config_data: dict[str, Any], active_profile: str) -> dict[str, Any]:
+        path = Path(input_path)
+        if not path.exists() or path.is_dir():
+            return config_data
+        suffix = path.suffix.lower()
+        resolution = None
+        if active_profile == "olfaction":
+            if suffix in {".csv", ".tsv", ".txt"}:
+                preview = _read_table(path)
+                resolution = resolve_olfactory_table_profile(path, preview.fieldnames, preview.rows)
+            elif suffix in {".json", ".jsonl"}:
+                resolution = resolve_olfactory_json_profile(path, _read_json(path))
+            else:
+                return config_data
+            if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+                return config_data
+            return merge_domain_profile_into_config(config_data, resolution)
+        if active_profile == "eeg":
+            if suffix in {".csv", ".tsv", ".txt"}:
+                preview = _read_table(path)
+                resolution = resolve_eeg_table_profile(path, preview.fieldnames, preview.rows)
+            elif suffix in {".json", ".jsonl"}:
+                resolution = resolve_eeg_json_profile(path, _read_json(path))
+            elif suffix == ".edf":
+                resolution = resolve_eeg_edf_profile(path)
+            else:
+                return config_data
+            if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+                return config_data
+            return merge_eeg_domain_profile_into_config(config_data, resolution)
+        return config_data
+
     def _ingest_with_config(self, input_path: str | Path, config_data: dict[str, Any]) -> TemporalEventCollection:
         adapter_name = str(config_data["adapter"])
 
@@ -159,5 +194,9 @@ class TSELPipeline:
             return config
         path = Path(config)
         return json.loads(path.read_text(encoding="utf-8"))
+
+
+
+
 
 

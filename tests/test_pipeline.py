@@ -356,8 +356,8 @@ def test_pipeline_rejects_incompatible_sensory_profile_switch() -> None:
 
     with pytest.raises(ValueError, match="sensory profile 'olfaction'"):
         pipeline.ingest(
-            ROOT / "examples" / "data" / "eeg_direct.json",
-            ROOT / "examples" / "configs" / "eeg_direct.json",
+            ROOT / "examples" / "data" / "environment_events.json",
+            ROOT / "examples" / "configs" / "environment.json",
             sensory_profile="olfaction",
         )
 

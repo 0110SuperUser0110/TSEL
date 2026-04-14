@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .eeg_profiles import PROFILE_ANNOTATION_LOG as EEG_PROFILE_ANNOTATION_LOG, merge_eeg_domain_profile_into_config, resolve_eeg_edf_profile, resolve_eeg_json_profile, resolve_eeg_table_profile
+from .olfactory_profiles import PROFILE_EVENT, PROFILE_SUBJECTIVE_REPORT, merge_domain_profile_into_config, resolve_olfactory_json_profile, resolve_olfactory_table_profile
 from .standards import normalize_sensory_profile
 
 
@@ -173,6 +175,17 @@ def _timestamp_spec(fieldnames: list[str], *, allow_row_number: bool = False) ->
 
 def _synthetic_timestamp_spec(*, unit: str = "seconds") -> dict[str, Any]:
     return {"column": _INTERNAL_SEQUENCE_COLUMN, "origin": _SYNTHETIC_TIME_ORIGIN, "unit": unit, "cast": "int"}
+
+
+def _temporal_field_spec(field_name: str | None) -> dict[str, Any] | None:
+    if field_name is None:
+        return None
+    normalized = _norm(field_name)
+    if normalized.endswith("_ms") or normalized == "elapsed_ms":
+        return {"column": field_name, "origin": _SYNTHETIC_TIME_ORIGIN, "unit": "milliseconds", "cast": "float"}
+    if normalized in {"elapsed_seconds", "elapsed_s", "window_start_seconds", "window_end_seconds"} or normalized.endswith("_seconds"):
+        return {"column": field_name, "origin": _SYNTHETIC_TIME_ORIGIN, "unit": "seconds", "cast": "float"}
+    return {"column": field_name}
 
 
 def _relative_time_context() -> dict[str, Any]:
@@ -366,6 +379,9 @@ def infer_acquisition_profile(input_path: str | Path) -> str:
         raise AutoRoutingError(f"input file not found: {path}")
     suffix = path.suffix.lower()
     if suffix == ".edf":
+        resolution = resolve_eeg_edf_profile(path)
+        if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+            raise AutoRoutingError(resolution.rationale or "insufficient deterministic EEG evidence in EDF input")
         return "eeg"
     if suffix in _TABLE_SUFFIXES:
         profile, _ = _infer_profile_from_table(path, _read_table(path))
@@ -385,6 +401,20 @@ def build_auto_ingest_plan(input_path: str | Path, sensory_profile: str) -> Auto
     if profile == "generic":
         profile = infer_acquisition_profile(path)
     suffix = path.suffix.lower()
+    if profile == "eeg":
+        if suffix in _TABLE_SUFFIXES:
+            return _plan_eeg_table(path, _read_table(path))
+        if suffix in _JSON_SUFFIXES:
+            return _plan_eeg_json(path, _read_json(path))
+        if suffix == ".edf":
+            return _plan_eeg_edf(path)
+    if profile == "olfaction":
+        if suffix in _TABLE_SUFFIXES:
+            return _plan_olfactory_table(path, _read_table(path))
+        if suffix in _JSON_SUFFIXES:
+            return _plan_olfactory_json(path, _read_json(path))
+        if suffix == ".edf":
+            raise AutoRoutingError("olfactory EDF auto-routing requires explicit odor annotations in a config; automatic olfactory profile resolution is not supported for EDF inputs")
     if suffix == ".edf":
         return _plan_edf(path, profile)
     if suffix in _TABLE_SUFFIXES:
@@ -622,5 +652,420 @@ def _plan_json(path: Path, profile: str, payload: Any) -> AutoIngestPlan:
 
 
 
+
+
+
+
+def _raise_eeg_profile_error(resolution) -> None:
+    if resolution.resolution_status == "ambiguous":
+        detail = ", ".join(resolution.candidate_profiles) or "multiple candidates"
+        raise AutoRoutingError(f"ambiguous EEG profile evidence: {detail}")
+    rationale = resolution.rationale or "the input does not expose enough deterministic EEG evidence"
+    raise AutoRoutingError(f"insufficient EEG profile evidence: {rationale}")
+
+
+def _plan_eeg_annotation_table(path: Path, preview: TablePreview, resolution) -> AutoIngestPlan:
+    fieldnames = preview.fieldnames
+    timestamp_field = _pick(fieldnames, _TIME_COLUMNS) or _pick(fieldnames, ("elapsed_ms", "elapsed_seconds", "elapsed_s", "window_start", "window_start_ms", "window_start_seconds"))
+    timestamp_spec = _temporal_field_spec(timestamp_field)
+    static_context = {
+        "ingest_mode": "auto_profile",
+        "sensory_profile": resolution.route_profile or "eeg",
+        "temporal_layer": "unified",
+    }
+    if timestamp_spec is None:
+        timestamp_spec = _synthetic_timestamp_spec()
+        static_context = _merge_static_context(static_context, _relative_time_context())
+    source_column = str(resolution.mapping_hints.get("source_field") or "")
+    label_field = resolution.mapping_hints.get("label_field")
+    signal_field = resolution.mapping_hints.get("signal_field")
+    unit_field = resolution.mapping_hints.get("unit_field")
+    window_id_field = resolution.mapping_hints.get("window_id_field")
+    window_end_field = resolution.mapping_hints.get("window_end_field")
+    if not source_column:
+        raise AutoRoutingError("EEG annotation logs require source or session context")
+    if label_field is None and signal_field is None:
+        raise AutoRoutingError("EEG annotation logs require an annotation label or signal field")
+    if signal_field is not None:
+        signal_spec = {"column": str(signal_field)}
+    elif resolution.modality == "sleep_stage":
+        signal_spec = {"value": "sleep_stage"}
+    else:
+        signal_spec = {"value": "marker"}
+    if label_field is not None:
+        value_spec = {"column": str(label_field)}
+    else:
+        value_spec = {"column": str(signal_field)}
+    if unit_field is not None:
+        unit_spec = {"column": str(unit_field)}
+    elif resolution.modality == "sleep_stage":
+        unit_spec = {"value": "stage"}
+    else:
+        unit_spec = {"value": "event"}
+    temporal: dict[str, Any] = {**_sequence_block(fieldnames, fallback_internal=True)}
+    if signal_field is None:
+        temporal["event_kind"] = {"value": "window" if window_end_field is not None else "marker"}
+    if window_end_field is not None:
+        end_spec = _temporal_field_spec(str(window_end_field))
+        if end_spec is not None:
+            temporal["end"] = end_spec
+    if window_id_field is not None:
+        temporal["window_id"] = {"column": str(window_id_field)}
+    config = {
+        "adapter": "csv",
+        "delimiter": preview.delimiter,
+        "mapping": {
+            "timestamp": timestamp_spec,
+            "modality": {"value": resolution.modality or "eeg"},
+            "source": {"column": source_column},
+            "signal_type": signal_spec,
+            "value": value_spec,
+            "unit": unit_spec,
+            "context": {"capture_remaining": True, "static": static_context},
+            "temporal": temporal,
+        },
+    }
+    config = merge_eeg_domain_profile_into_config(config, resolution)
+    return AutoIngestPlan(path, "eeg", "csv", resolution.rationale, config, "table")
+
+
+def _plan_eeg_annotation_json(path: Path, payload: Any, resolution) -> AutoIngestPlan:
+    records = _json_records(payload)
+    fieldnames = list(records[0].keys()) if records else []
+    timestamp_field = _pick(fieldnames, _TIME_COLUMNS) or _pick(fieldnames, ("elapsed_ms", "elapsed_seconds", "elapsed_s", "window_start", "window_start_ms", "window_start_seconds"))
+    timestamp_spec = _temporal_field_spec(timestamp_field)
+    static_context = {
+        "ingest_mode": "auto_profile",
+        "sensory_profile": resolution.route_profile or "eeg",
+        "temporal_layer": "unified",
+    }
+    if timestamp_spec is None:
+        timestamp_spec = _synthetic_timestamp_spec()
+        static_context = _merge_static_context(static_context, _relative_time_context())
+    source_column = str(resolution.mapping_hints.get("source_field") or "")
+    label_field = resolution.mapping_hints.get("label_field")
+    signal_field = resolution.mapping_hints.get("signal_field")
+    unit_field = resolution.mapping_hints.get("unit_field")
+    window_id_field = resolution.mapping_hints.get("window_id_field")
+    window_end_field = resolution.mapping_hints.get("window_end_field")
+    if not source_column:
+        raise AutoRoutingError("EEG annotation logs require source or session context")
+    if label_field is None and signal_field is None:
+        raise AutoRoutingError("EEG annotation logs require an annotation label or signal field")
+    if signal_field is not None:
+        signal_spec = {"column": str(signal_field)}
+    elif resolution.modality == "sleep_stage":
+        signal_spec = {"value": "sleep_stage"}
+    else:
+        signal_spec = {"value": "marker"}
+    if label_field is not None:
+        value_spec = {"column": str(label_field)}
+    else:
+        value_spec = {"column": str(signal_field)}
+    if unit_field is not None:
+        unit_spec = {"column": str(unit_field)}
+    elif resolution.modality == "sleep_stage":
+        unit_spec = {"value": "stage"}
+    else:
+        unit_spec = {"value": "event"}
+    temporal: dict[str, Any] = {**_sequence_block(fieldnames, fallback_internal=True)}
+    if signal_field is None:
+        temporal["event_kind"] = {"value": "window" if window_end_field is not None else "marker"}
+    if window_end_field is not None:
+        end_spec = _temporal_field_spec(str(window_end_field))
+        if end_spec is not None:
+            temporal["end"] = end_spec
+    if window_id_field is not None:
+        temporal["window_id"] = {"column": str(window_id_field)}
+    config = {
+        "adapter": "json",
+        "mapping": {
+            "timestamp": timestamp_spec,
+            "modality": {"value": resolution.modality or "eeg"},
+            "source": {"column": source_column},
+            "signal_type": signal_spec,
+            "value": value_spec,
+            "unit": unit_spec,
+            "context": {"capture_remaining": True, "static": static_context},
+            "temporal": temporal,
+        },
+    }
+    config = merge_eeg_domain_profile_into_config(config, resolution)
+    return AutoIngestPlan(path, "eeg", "json", resolution.rationale, config, "json")
+
+
+def _plan_eeg_table(path: Path, preview: TablePreview) -> AutoIngestPlan:
+    resolution = resolve_eeg_table_profile(path, preview.fieldnames, preview.rows)
+    if resolution.resolution_status in {"ambiguous", "unresolved"}:
+        _raise_eeg_profile_error(resolution)
+    if resolution.profile_id == EEG_PROFILE_ANNOTATION_LOG:
+        return _plan_eeg_annotation_table(path, preview, resolution)
+    base_plan = _plan_table(path, "eeg", preview)
+    config = merge_eeg_domain_profile_into_config(base_plan.config, resolution)
+    return AutoIngestPlan(base_plan.input_path, "eeg", base_plan.adapter, resolution.rationale, config, base_plan.detected_format)
+
+
+def _plan_eeg_json(path: Path, payload: Any) -> AutoIngestPlan:
+    resolution = resolve_eeg_json_profile(path, payload)
+    if resolution.resolution_status in {"ambiguous", "unresolved"}:
+        _raise_eeg_profile_error(resolution)
+    if resolution.profile_id == EEG_PROFILE_ANNOTATION_LOG:
+        return _plan_eeg_annotation_json(path, payload, resolution)
+    base_plan = _plan_json(path, "eeg", payload)
+    config = merge_eeg_domain_profile_into_config(base_plan.config, resolution)
+    return AutoIngestPlan(base_plan.input_path, "eeg", base_plan.adapter, resolution.rationale, config, base_plan.detected_format)
+
+
+def _plan_eeg_edf(path: Path) -> AutoIngestPlan:
+    resolution = resolve_eeg_edf_profile(path)
+    if resolution.resolution_status in {"ambiguous", "unresolved"}:
+        _raise_eeg_profile_error(resolution)
+    base_plan = _plan_edf(path, "eeg")
+    config = merge_eeg_domain_profile_into_config(base_plan.config, resolution)
+    return AutoIngestPlan(base_plan.input_path, "eeg", base_plan.adapter, resolution.rationale, config, base_plan.detected_format)
+
+
+def _raise_olfactory_profile_error(resolution) -> None:
+    if resolution.resolution_status == "ambiguous":
+        detail = ", ".join(resolution.candidate_profiles) or "multiple candidates"
+        raise AutoRoutingError(f"ambiguous olfactory profile evidence: {detail}")
+    raise AutoRoutingError(resolution.rationale or "insufficient olfactory profile evidence")
+
+
+def _extend_timeseries_context(plan: AutoIngestPlan, extra_columns: list[str]) -> AutoIngestPlan:
+    if plan.adapter != "timeseries_csv":
+        return plan
+    config = dict(plan.config)
+    context = dict(config.get("context", {}))
+    includes = [str(value) for value in context.get("include", [])]
+    for column in extra_columns:
+        if column and column not in includes:
+            includes.append(column)
+    context["include"] = includes
+    config["context"] = context
+    return AutoIngestPlan(plan.input_path, plan.sensory_profile, plan.adapter, plan.rationale, config, plan.detected_format)
+
+
+def _plan_olfactory_table(path: Path, preview: TablePreview) -> AutoIngestPlan:
+    fieldnames = preview.fieldnames
+    resolution = resolve_olfactory_table_profile(path, fieldnames, preview.rows)
+    if resolution.resolution_status in {"ambiguous", "unresolved"}:
+        _raise_olfactory_profile_error(resolution)
+
+    hints = resolution.mapping_hints
+    static_context = {
+        "ingest_mode": "auto_profile",
+        "sensory_profile": resolution.route_profile or "olfaction",
+        "temporal_layer": "unified",
+    }
+
+    if resolution.profile_id == PROFILE_SUBJECTIVE_REPORT:
+        timestamp_spec = _timestamp_spec(fieldnames, allow_row_number=True)
+        if timestamp_spec is None:
+            timestamp_spec = _synthetic_timestamp_spec()
+            static_context = _merge_static_context(static_context, _relative_time_context())
+        text_column = str(hints.get("text_field") or "")
+        source_column = str(hints.get("source_field") or "")
+        if not text_column or not source_column:
+            raise AutoRoutingError("olfactory subjective reports require source and report text fields")
+        config = {
+            "adapter": "csv",
+            "delimiter": preview.delimiter,
+            "mapping": {
+                "timestamp": timestamp_spec,
+                "modality": {"value": "olfaction"},
+                "source": {"column": source_column},
+                "signal_type": {"value": "subjective_report"},
+                "value": {"column": text_column},
+                "unit": {"value": "text"},
+                "context": {"capture_remaining": True, "static": static_context},
+                "temporal": {"event_kind": {"value": "report"}, **_sequence_block(fieldnames, fallback_internal=True)},
+            },
+        }
+        config = merge_domain_profile_into_config(config, resolution)
+        return AutoIngestPlan(path, "olfaction", "csv", resolution.rationale, config, "table")
+
+    if resolution.profile_id == PROFILE_EVENT:
+        timestamp_spec = _timestamp_spec(fieldnames, allow_row_number=True)
+        if timestamp_spec is None:
+            timestamp_spec = _synthetic_timestamp_spec()
+            static_context = _merge_static_context(static_context, _relative_time_context())
+        source_column = str(hints.get("source_field") or "")
+        explicit_signal_field = hints.get("signal_field")
+        explicit_value_field = hints.get("value_field")
+        marker_field = hints.get("marker_field")
+        odor_field = hints.get("odor_field")
+        value_column = explicit_value_field or marker_field or odor_field
+        if not source_column or not value_column:
+            raise AutoRoutingError("olfactory event logs require source plus a supported value field")
+        if explicit_signal_field is not None:
+            signal_spec = {"column": str(explicit_signal_field)}
+        elif explicit_value_field is not None:
+            signal_spec = {"value": str(explicit_value_field)}
+        elif marker_field is not None:
+            signal_spec = {"value": "marker"}
+        else:
+            signal_spec = {"value": "odor_identity"}
+        unit_field = hints.get("unit_field")
+        value_spec = {"column": str(value_column)}
+        if explicit_value_field is not None and str(value_column) == str(explicit_value_field):
+            value_spec["cast"] = "float"
+        if unit_field:
+            unit_spec = {"column": str(unit_field)}
+        elif marker_field is not None and explicit_value_field is None:
+            unit_spec = {"value": "event"}
+        elif explicit_value_field is not None:
+            unit_spec = {"value": _unit_for(str(explicit_value_field), "olfaction")}
+        elif odor_field is not None:
+            unit_spec = {"value": "text"}
+        else:
+            unit_spec = {"value": "a.u."}
+        temporal: dict[str, Any] = {}
+        if marker_field is not None and hints.get("value_field") is None:
+            temporal["event_kind"] = {"value": "marker"}
+        presentation_phase = _pick(fieldnames, ("presentation_phase",))
+        if presentation_phase is not None:
+            temporal["phase"] = {"column": presentation_phase}
+        config = {
+            "adapter": "csv",
+            "delimiter": preview.delimiter,
+            "mapping": {
+                "timestamp": timestamp_spec,
+                "modality": {"value": resolution.modality or "olfaction"},
+                "source": {"column": source_column},
+                "signal_type": signal_spec,
+                "value": value_spec,
+                "unit": unit_spec,
+                "context": {"capture_remaining": True, "static": static_context},
+                **({"temporal": temporal} if temporal else {}),
+            },
+        }
+        config = merge_domain_profile_into_config(config, resolution)
+        return AutoIngestPlan(path, "olfaction", "csv", resolution.rationale, config, "table")
+
+    route_profile = str(resolution.route_profile or "olfaction")
+    base_plan = _plan_table(path, route_profile, preview)
+    extra_columns = [
+        str(value)
+        for value in (
+            hints.get("odor_field"),
+            hints.get("concentration_field"),
+            hints.get("trial_field"),
+            hints.get("receptor_field"),
+            hints.get("marker_field"),
+        )
+        if value
+    ]
+    base_plan = _extend_timeseries_context(base_plan, extra_columns)
+    config = merge_domain_profile_into_config(base_plan.config, resolution)
+    return AutoIngestPlan(base_plan.input_path, "olfaction", base_plan.adapter, resolution.rationale, config, base_plan.detected_format)
+
+
+def _plan_olfactory_json(path: Path, payload: Any) -> AutoIngestPlan:
+    resolution = resolve_olfactory_json_profile(path, payload)
+    if resolution.resolution_status in {"ambiguous", "unresolved"}:
+        _raise_olfactory_profile_error(resolution)
+
+    if resolution.profile_id == PROFILE_SUBJECTIVE_REPORT:
+        records = _json_records(payload)
+        fieldnames = list(records[0].keys()) if records else []
+        text_column = str(resolution.mapping_hints.get("text_field") or "")
+        source_column = str(resolution.mapping_hints.get("source_field") or "")
+        timestamp_spec = _timestamp_spec(fieldnames, allow_row_number=True)
+        static_context = {
+            "ingest_mode": "auto_profile",
+            "sensory_profile": resolution.route_profile or "olfaction",
+            "temporal_layer": "unified",
+        }
+        if timestamp_spec is None:
+            timestamp_spec = _synthetic_timestamp_spec()
+            static_context = _merge_static_context(static_context, _relative_time_context())
+        if not text_column or not source_column:
+            raise AutoRoutingError("olfactory subjective reports require source and report text fields")
+        config = {
+            "adapter": "json",
+            "mapping": {
+                "timestamp": timestamp_spec,
+                "modality": {"value": "olfaction"},
+                "source": {"column": source_column},
+                "signal_type": {"value": "subjective_report"},
+                "value": {"column": text_column},
+                "unit": {"value": "text"},
+                "context": {"capture_remaining": True, "static": static_context},
+                "temporal": {"event_kind": {"value": "report"}, **_sequence_block(fieldnames, fallback_internal=True)},
+            },
+        }
+        config = merge_domain_profile_into_config(config, resolution)
+        return AutoIngestPlan(path, "olfaction", "json", resolution.rationale, config, "json")
+
+    if resolution.profile_id == PROFILE_EVENT:
+        records = _json_records(payload)
+        fieldnames = list(records[0].keys()) if records else []
+        hints = resolution.mapping_hints
+        timestamp_spec = _timestamp_spec(fieldnames, allow_row_number=True)
+        static_context = {
+            "ingest_mode": "auto_profile",
+            "sensory_profile": resolution.route_profile or "olfaction",
+            "temporal_layer": "unified",
+        }
+        if timestamp_spec is None:
+            timestamp_spec = _synthetic_timestamp_spec()
+            static_context = _merge_static_context(static_context, _relative_time_context())
+        source_column = str(hints.get("source_field") or "")
+        explicit_signal_field = hints.get("signal_field")
+        explicit_value_field = hints.get("value_field")
+        marker_field = hints.get("marker_field")
+        odor_field = hints.get("odor_field")
+        value_column = explicit_value_field or marker_field or odor_field
+        if not source_column or not value_column:
+            raise AutoRoutingError("olfactory JSON event logs require source plus a supported value field")
+        if explicit_signal_field is not None:
+            signal_spec = {"column": str(explicit_signal_field)}
+        elif explicit_value_field is not None:
+            signal_spec = {"value": str(explicit_value_field)}
+        elif marker_field is not None:
+            signal_spec = {"value": "marker"}
+        else:
+            signal_spec = {"value": "odor_identity"}
+        unit_field = hints.get("unit_field")
+        value_spec = {"column": str(value_column)}
+        if explicit_value_field is not None and str(value_column) == str(explicit_value_field):
+            value_spec["cast"] = "float"
+        if unit_field:
+            unit_spec = {"column": str(unit_field)}
+        elif marker_field is not None and explicit_value_field is None:
+            unit_spec = {"value": "event"}
+        elif explicit_value_field is not None:
+            unit_spec = {"value": _unit_for(str(explicit_value_field), "olfaction")}
+        elif odor_field is not None:
+            unit_spec = {"value": "text"}
+        else:
+            unit_spec = {"value": "a.u."}
+        temporal: dict[str, Any] = {}
+        if marker_field is not None and explicit_value_field is None:
+            temporal["event_kind"] = {"value": "marker"}
+        presentation_phase = _pick(fieldnames, ("presentation_phase",))
+        if presentation_phase is not None:
+            temporal["phase"] = {"column": presentation_phase}
+        config = {
+            "adapter": "json",
+            "mapping": {
+                "timestamp": timestamp_spec,
+                "modality": {"value": resolution.modality or "olfaction"},
+                "source": {"column": source_column},
+                "signal_type": signal_spec,
+                "value": value_spec,
+                "unit": unit_spec,
+                "context": {"capture_remaining": True, "static": static_context},
+                **({"temporal": temporal} if temporal else {}),
+            },
+        }
+        config = merge_domain_profile_into_config(config, resolution)
+        return AutoIngestPlan(path, "olfaction", "json", resolution.rationale, config, "json")
+
+    route_profile = str(resolution.route_profile or "olfaction")
+    base_plan = _plan_json(path, route_profile, payload)
+    config = merge_domain_profile_into_config(base_plan.config, resolution)
+    return AutoIngestPlan(base_plan.input_path, "olfaction", base_plan.adapter, resolution.rationale, config, base_plan.detected_format)
 
 

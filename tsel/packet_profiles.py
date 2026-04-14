@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from .autorouting import AutoIngestPlan
+from .autorouting import AutoIngestPlan, build_auto_ingest_plan
+from .eeg_profiles import resolve_eeg_packet_profile
+from .olfactory_profiles import merge_domain_profile_into_config, resolve_olfactory_packet_profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,12 +27,16 @@ _SYNAPSE_REQUIRED_FILES = (
     "TrainSet.txt",
 )
 _SYNAPSE_OPTIONAL_FILES = ("train_set.mat",)
+_EEG_PACKET_MANIFEST = "packet_manifest.json"
 
 
 def detect_special_packet_type(input_path: str | Path) -> str | None:
     path = Path(input_path)
     if not path.is_dir():
         return None
+    manifest = _load_packet_manifest(path)
+    if isinstance(manifest, dict) and str(manifest.get("packet_type") or "").strip() == "eeg_session":
+        return "eeg_session"
     members = {child.name for child in path.iterdir() if child.is_file()}
     if all(name in members for name in _SYNAPSE_REQUIRED_FILES):
         return "dream_synapse"
@@ -40,6 +46,30 @@ def detect_special_packet_type(input_path: str | Path) -> str | None:
 def describe_special_packet(input_path: str | Path) -> dict[str, Any] | None:
     path = Path(input_path)
     packet_type = detect_special_packet_type(path)
+    if packet_type == "eeg_session":
+        manifest = _load_packet_manifest(path) or {}
+        members = []
+        for raw_member in manifest.get("members", []):
+            if not isinstance(raw_member, dict):
+                continue
+            member_path = path / str(raw_member.get("path", ""))
+            members.append(
+                {
+                    "path": str(raw_member.get("path", "")),
+                    "profile": str(raw_member.get("profile") or "eeg"),
+                    "status": "packet member" if member_path.exists() else "missing packet member",
+                    "size_bytes": member_path.stat().st_size if member_path.exists() else None,
+                }
+            )
+        return {
+            "format": "packet",
+            "packet_type": packet_type,
+            "root": str(path.resolve()),
+            "file_count": len(members),
+            "preview_files": members,
+            "session_id": manifest.get("session_id"),
+            "trial_id": manifest.get("trial_id"),
+        }
     if packet_type != "dream_synapse":
         return None
 
@@ -69,6 +99,40 @@ def describe_special_packet(input_path: str | Path) -> dict[str, Any] | None:
 def plan_special_packet(input_path: str | Path, requested_profile: str) -> list[AutoIngestPlan] | None:
     path = Path(input_path)
     packet_type = detect_special_packet_type(path)
+    if packet_type == "eeg_session":
+        if requested_profile not in {"generic", "eeg"}:
+            raise ValueError("This raw packet is EEG session data. Use the internal EEG acquisition route when ingesting it programmatically.")
+        manifest = _load_packet_manifest(path)
+        if not isinstance(manifest, dict):
+            raise ValueError("EEG packet manifest could not be read.")
+        resolution = resolve_eeg_packet_profile(packet_type)
+        packet_context = _eeg_packet_context(manifest, resolution)
+        plans: list[AutoIngestPlan] = []
+        for raw_member in manifest.get("members", []):
+            if not isinstance(raw_member, dict):
+                continue
+            relative_member = str(raw_member.get("path") or "").strip()
+            if not relative_member:
+                continue
+            member_path = (path / relative_member).resolve()
+            if not member_path.exists() or not member_path.is_file():
+                raise ValueError(f"EEG packet member not found: {relative_member}")
+            member_profile = str(raw_member.get("profile") or "eeg").strip() or "eeg"
+            base_plan = build_auto_ingest_plan(member_path, member_profile)
+            config = _merge_packet_static_context(base_plan.config, packet_context)
+            plans.append(
+                AutoIngestPlan(
+                    input_path=base_plan.input_path,
+                    sensory_profile="eeg",
+                    adapter=base_plan.adapter,
+                    rationale=f"{base_plan.rationale} Member of an explicit EEG session packet.",
+                    config=config,
+                    detected_format="packet_member",
+                )
+            )
+        if not plans:
+            raise ValueError("EEG packet manifest does not declare any usable members.")
+        return plans
     if packet_type != "dream_synapse":
         return None
     if requested_profile not in {"generic", "olfaction"}:
@@ -77,7 +141,8 @@ def plan_special_packet(input_path: str | Path, requested_profile: str) -> list[
     cache_dir = _packet_cache_dir(path, packet_type)
     cache_dir.mkdir(parents=True, exist_ok=True)
     derived_files = _build_synapse_packet_files(path, cache_dir)
-    config = _packet_json_config()
+    resolution = resolve_olfactory_packet_profile(packet_type)
+    config = merge_domain_profile_into_config(_packet_json_config(), resolution)
 
     return [
         AutoIngestPlan(
@@ -95,6 +160,84 @@ def plan_special_packet(input_path: str | Path, requested_profile: str) -> list[
 def _packet_cache_dir(packet_dir: Path, packet_type: str) -> Path:
     digest = hashlib.sha1(str(packet_dir.resolve()).encode("utf-8")).hexdigest()[:12]
     return PACKET_CACHE_ROOT / packet_type / digest
+
+
+def _load_packet_manifest(path: Path) -> dict[str, Any] | None:
+    manifest_path = path / _EEG_PACKET_MANIFEST
+    if not manifest_path.exists() or not manifest_path.is_file():
+        return None
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+
+def _eeg_packet_context(manifest: dict[str, Any], resolution) -> dict[str, Any]:
+    session_id = str(manifest.get("session_id") or "").strip()
+    trial_id = str(manifest.get("trial_id") or "").strip()
+    dataset = str(manifest.get("dataset") or "").strip()
+    context: dict[str, Any] = {
+        "ingest_mode": "packet_profile",
+        "packet_profile": "eeg_session",
+        "packet_profile_id": getattr(resolution, "profile_id", None),
+        "packet_resolution_status": getattr(resolution, "resolution_status", None),
+        "temporal_layer": "unified",
+        "assertion_basis": {
+            "packet_profile": "packet_declared",
+            "packet_profile_id": "packet_declared",
+            "packet_resolution_status": "packet_declared",
+        },
+    }
+    alignment: dict[str, Any] = {}
+    if session_id:
+        alignment["session_id"] = session_id
+        context["assertion_basis"]["alignment.session_id"] = "packet_declared"
+    if trial_id:
+        alignment["trial_id"] = trial_id
+        context["assertion_basis"]["alignment.trial_id"] = "packet_declared"
+    if alignment:
+        context["alignment"] = alignment
+    if dataset:
+        context["dataset"] = dataset
+        context["assertion_basis"]["dataset"] = "packet_declared"
+    return context
+
+
+
+def _merge_packet_static_context(config: dict[str, Any], packet_context: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(config)
+    adapter = str(merged.get("adapter", ""))
+    if adapter in {"csv", "json"}:
+        mapping = dict(merged.get("mapping", {}))
+        context = dict(mapping.get("context", {}))
+        static = dict(context.get("static", {}))
+        context["static"] = _merge_nested(static, packet_context)
+        mapping["context"] = context
+        merged["mapping"] = mapping
+        return merged
+    if adapter == "timeseries_csv":
+        context = dict(merged.get("context", {}))
+        static = dict(context.get("static", {}))
+        context["static"] = _merge_nested(static, packet_context)
+        merged["context"] = context
+        return merged
+    if adapter in {"timeseries_json", "edf"}:
+        merged["context"] = _merge_nested(dict(merged.get("context", {})), packet_context)
+        return merged
+    return merged
+
+
+
+def _merge_nested(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in extra.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _merge_nested(dict(merged[key]), value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _packet_json_config() -> dict[str, Any]:
@@ -123,9 +266,6 @@ def _packet_json_config() -> dict[str, Any]:
                     },
                     "sensory": {"primary_sense": "olfaction"},
                     "acquisition": {
-                        "acquisition_profile": "olfaction",
-                        "instrument": "dream_synapse_packet",
-                        "device_class": "record_stream",
                         "transform_stage": "normalized",
                     },
                 },
@@ -412,4 +552,8 @@ def _clean_numeric_value(value: object) -> float | None:
 
 def _iso_timestamp(origin: datetime, offset_seconds: int) -> str:
     return (origin + timedelta(seconds=offset_seconds)).isoformat().replace("+00:00", "Z")
+
+
+
+
 

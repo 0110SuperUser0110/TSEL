@@ -439,10 +439,35 @@ def _infer_modality_from_config(config_data: dict[str, Any]) -> str | None:
     return None
 
 
+def _infer_primary_sense_from_config(config_data: dict[str, Any]) -> str | None:
+    context_block: dict[str, Any] | None = None
+    if "mapping" in config_data and isinstance(config_data["mapping"], dict):
+        context_spec = config_data["mapping"].get("context")
+        if isinstance(context_spec, dict):
+            static_context = context_spec.get("static")
+            if isinstance(static_context, dict):
+                context_block = static_context
+    elif isinstance(config_data.get("context"), dict):
+        context_block = dict(config_data["context"])
+
+    if not isinstance(context_block, dict):
+        return None
+    sensory = context_block.get("sensory")
+    if isinstance(sensory, dict) and sensory.get("primary_sense") is not None:
+        return normalize_primary_sense(str(sensory["primary_sense"]))
+    domain_profile = context_block.get("domain_profile")
+    if isinstance(domain_profile, dict) and domain_profile.get("domain") is not None:
+        return _canonical_token(str(domain_profile["domain"]))
+    return None
+
+
 def infer_sensory_profile(config_data: dict[str, Any]) -> str:
     explicit = config_data.get("sensory_profile")
     if explicit is not None:
         return normalize_sensory_profile(str(explicit))
+    primary_sense = _infer_primary_sense_from_config(config_data)
+    if primary_sense in SENSORY_PROFILES:
+        return str(primary_sense)
     modality = _infer_modality_from_config(config_data)
     if modality is None:
         return "generic"
@@ -464,10 +489,14 @@ def validate_sensory_profile(config_data: dict[str, Any], profile: str) -> None:
         return
     normalized_modality = normalize_modality(modality)
     allowed_modalities = set(profile_spec["modalities"])
-    if allowed_modalities and normalized_modality not in allowed_modalities:
-        raise ValueError(
-            f"sensory profile '{normalized_profile}' is incompatible with modality '{normalized_modality}'"
-        )
+    if allowed_modalities and normalized_modality in allowed_modalities:
+        return
+    primary_sense = _infer_primary_sense_from_config(config_data)
+    if primary_sense == normalized_profile:
+        return
+    raise ValueError(
+        f"sensory profile '{normalized_profile}' is incompatible with modality '{normalized_modality}'"
+    )
 
 
 def vocabulary_snapshot() -> dict[str, Any]:
@@ -549,6 +578,15 @@ def event_schema() -> dict[str, Any]:
         "intensity_estimate": {"type": ["number", "null"]},
         "intensity_unit": {"type": ["string", "null"]},
     }
+    domain_profile_properties = {
+        "domain": {"type": ["string", "null"]},
+        "profile_id": {"type": ["string", "null"]},
+        "profile_version": {"type": ["string", "null"]},
+        "resolution_status": {"type": ["string", "null"]},
+        "evidence_signatures": {"type": "array", "items": {"type": "string"}},
+        "candidate_profiles": {"type": "array", "items": {"type": "string"}},
+        "missing_metadata": {"type": "array", "items": {"type": "string"}},
+    }
     relation_properties = {
         "relation_type": {"type": "string"},
         "target_id": {"type": "string"},
@@ -609,6 +647,11 @@ def event_schema() -> dict[str, Any]:
                     "stimulus": {
                         "type": "object",
                         "properties": stimulus_properties,
+                        "additionalProperties": True,
+                    },
+                    "domain_profile": {
+                        "type": "object",
+                        "properties": domain_profile_properties,
                         "additionalProperties": True,
                     },
                     "relations": {
@@ -1266,6 +1309,49 @@ def evaluate_conformance(records: list[dict[str, Any]], temporal_validation: Val
                             )
                         )
 
+        domain_profile = contextual_metadata.get("domain_profile")
+        if domain_profile is not None:
+            if not isinstance(domain_profile, dict):
+                issues.append(
+                    ValidationIssue(
+                        severity="error",
+                        code="invalid_domain_profile_context",
+                        message="contextual_metadata.domain_profile must be an object when provided",
+                        event_index=index,
+                    )
+                )
+            else:
+                resolution_status = domain_profile.get("resolution_status")
+                normalized_resolution_status = None if resolution_status is None else _canonical_token(str(resolution_status))
+                if normalized_resolution_status is not None and normalized_resolution_status not in {"resolved", "partial", "ambiguous", "unresolved"}:
+                    issues.append(
+                        ValidationIssue(
+                            severity="error",
+                            code="invalid_domain_profile_status",
+                            message=f"domain_profile resolution_status '{resolution_status}' is not supported",
+                            event_index=index,
+                        )
+                    )
+                profile_id = domain_profile.get("profile_id")
+                if normalized_resolution_status == "resolved" and profile_id is None:
+                    issues.append(
+                        ValidationIssue(
+                            severity="error",
+                            code="missing_domain_profile_id",
+                            message="resolved domain_profile claims require profile_id",
+                            event_index=index,
+                        )
+                    )
+                if normalized_resolution_status in {"ambiguous", "unresolved"} and profile_id is not None:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            code="conflicting_domain_profile_status",
+                            message="ambiguous or unresolved domain_profile claims should not also populate profile_id",
+                            event_index=index,
+                        )
+                    )
+
         relations = contextual_metadata.get("relations")
         if relations is not None:
             if not isinstance(relations, list):
@@ -1396,6 +1482,25 @@ def evaluate_conformance(records: list[dict[str, Any]], temporal_validation: Val
                             event_index=index,
                         )
                     )
+        if isinstance(domain_profile, dict):
+            if domain_profile.get("profile_id") is not None and assertion_basis.get("domain_profile.profile_id") is None:
+                issues.append(
+                    ValidationIssue(
+                        severity="warning",
+                        code="missing_domain_profile_basis",
+                        message="domain_profile.profile_id should declare assertion_basis.domain_profile.profile_id",
+                        event_index=index,
+                    )
+                )
+            if domain_profile.get("resolution_status") is not None and assertion_basis.get("domain_profile.resolution_status") is None:
+                issues.append(
+                    ValidationIssue(
+                        severity="warning",
+                        code="missing_domain_profile_basis",
+                        message="domain_profile.resolution_status should declare assertion_basis.domain_profile.resolution_status",
+                        event_index=index,
+                    )
+                )
         if isinstance(relations, list) and relations and assertion_basis.get("relations") is None:
             issues.append(
                 ValidationIssue(
@@ -1475,4 +1580,10 @@ def evaluate_conformance(records: list[dict[str, Any]], temporal_validation: Val
         issues=issues,
         temporal_validation=temporal_validation,
     )
+
+
+
+
+
+
 

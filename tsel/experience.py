@@ -116,6 +116,13 @@ def _set_assertion_basis(event: TemporalEvent, field_path: str, basis: str) -> N
     event.contextual_metadata["assertion_basis"] = normalized
 
 
+def _set_assertion_basis_if_missing(event: TemporalEvent, field_path: str, basis: str) -> None:
+    basis_map = event.contextual_metadata.get("assertion_basis")
+    if isinstance(basis_map, dict) and basis_map.get(field_path) is not None:
+        return
+    _set_assertion_basis(event, field_path, basis)
+
+
 def _mark_unresolved(event: TemporalEvent, field_path: str, reason: str) -> None:
     unresolved = event.contextual_metadata.get("unresolved")
     normalized = dict(unresolved) if isinstance(unresolved, dict) else {}
@@ -138,17 +145,22 @@ def _clear_unresolved(event: TemporalEvent, field_path: str) -> None:
 
 def _record_existing_structure_basis(event: TemporalEvent) -> None:
     ingest_mode = str(event.contextual_metadata.get("ingest_mode", "")).strip()
-    basis = PACKET_BASIS if ingest_mode == "packet_profile" else SOURCE_BASIS
+    if ingest_mode == "packet_profile":
+        basis = PACKET_BASIS
+    elif ingest_mode == "auto_profile":
+        basis = DERIVED_BASIS
+    else:
+        basis = SOURCE_BASIS
     if event.phase is not None:
-        _set_assertion_basis(event, "temporal.phase", basis)
-    for block_name in ("sensory", "acquisition", "stimulus"):
+        _set_assertion_basis_if_missing(event, "temporal.phase", basis)
+    for block_name in ("sensory", "acquisition", "stimulus", "domain_profile"):
         block = event.contextual_metadata.get(block_name)
         if not isinstance(block, dict):
             continue
         for key in block.keys():
-            _set_assertion_basis(event, f"{block_name}.{key}", basis)
+            _set_assertion_basis_if_missing(event, f"{block_name}.{key}", basis)
     if isinstance(event.contextual_metadata.get("relations"), list):
-        _set_assertion_basis(event, "relations", basis)
+        _set_assertion_basis_if_missing(event, "relations", basis)
 
 
 def _explicit_hint_tokens(event: TemporalEvent) -> set[str]:
@@ -755,6 +767,8 @@ def enrich_experience(collection: TemporalEventCollection, *, strict: bool = STR
 
     collection.sort_in_place()
     return collection
+
+
 
 
 
