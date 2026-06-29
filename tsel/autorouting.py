@@ -8,6 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from .eeg_profiles import PROFILE_ANNOTATION_LOG as EEG_PROFILE_ANNOTATION_LOG, merge_eeg_domain_profile_into_config, resolve_eeg_edf_profile, resolve_eeg_json_profile, resolve_eeg_table_profile
+from .general_profiles import (
+    merge_general_domain_profile_into_config,
+    resolve_dream_json_profile,
+    resolve_dream_table_profile,
+    resolve_environment_json_profile,
+    resolve_environment_table_profile,
+    resolve_multisensory_json_profile,
+    resolve_multisensory_table_profile,
+)
 from .olfactory_profiles import PROFILE_EVENT, PROFILE_SUBJECTIVE_REPORT, merge_domain_profile_into_config, resolve_olfactory_json_profile, resolve_olfactory_table_profile
 from .standards import normalize_sensory_profile
 
@@ -466,6 +475,9 @@ def _plan_table(path: Path, profile: str, preview: TablePreview) -> AutoIngestPl
                 "temporal": {"event_kind": {"value": "report"}, **_sequence_block(fieldnames, fallback_internal=True)},
             },
         }
+        resolution = resolve_dream_table_profile(path, fieldnames)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
         return AutoIngestPlan(path, profile, "csv", "Detected dream-report rows in a table.", config, "table")
 
     if profile == "environment" and {"measurement", "reading"} & {_norm(name) for name in fieldnames}:
@@ -493,6 +505,9 @@ def _plan_table(path: Path, profile: str, preview: TablePreview) -> AutoIngestPl
                 "context": {"capture_remaining": True, "static": static_context},
             },
         }
+        resolution = resolve_environment_table_profile(path, fieldnames, preview.rows)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
         return AutoIngestPlan(path, profile, "csv", "Detected row-based environmental observations.", config, "table")
 
     timestamp_spec = _timestamp_spec(fieldnames)
@@ -567,6 +582,14 @@ def _plan_table(path: Path, profile: str, preview: TablePreview) -> AutoIngestPl
         if uses_sequence_time
         else f"Detected timestamped {profile} channels in a table."
     )
+    if profile == "environment":
+        resolution = resolve_environment_table_profile(path, fieldnames, preview.rows)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
+    elif profile == "multisensory":
+        resolution = resolve_multisensory_table_profile(path, fieldnames, preview.rows)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
     return AutoIngestPlan(path, profile, "timeseries_csv", rationale, config, "table")
 def _plan_json(path: Path, profile: str, payload: Any) -> AutoIngestPlan:
     if isinstance(payload, dict) and isinstance(payload.get("channels"), dict):
@@ -601,6 +624,14 @@ def _plan_json(path: Path, profile: str, payload: Any) -> AutoIngestPlan:
             "annotation_signal_type": "marker",
             "annotation_unit": "event",
         }
+        if profile == "environment":
+            resolution = resolve_environment_json_profile(path, payload)
+            if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+                config = merge_general_domain_profile_into_config(config, resolution)
+        elif profile == "multisensory":
+            resolution = resolve_multisensory_json_profile(path, payload)
+            if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+                config = merge_general_domain_profile_into_config(config, resolution)
         return AutoIngestPlan(path, profile, "timeseries_json", f"Detected multichannel {profile} JSON streams.", config, "json")
 
     records = _json_records(payload)
@@ -648,6 +679,18 @@ def _plan_json(path: Path, profile: str, payload: Any) -> AutoIngestPlan:
             **({"temporal": temporal} if temporal else {}),
         },
     }
+    if profile == "dream":
+        resolution = resolve_dream_json_profile(path, payload)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
+    elif profile == "environment":
+        resolution = resolve_environment_json_profile(path, payload)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
+    elif profile == "multisensory":
+        resolution = resolve_multisensory_json_profile(path, payload)
+        if resolution.profile_id is not None and resolution.resolution_status not in {"ambiguous", "unresolved"}:
+            config = merge_general_domain_profile_into_config(config, resolution)
     return AutoIngestPlan(path, profile, "json", f"Detected row-style {profile} records in JSON.", config, "json")
 
 

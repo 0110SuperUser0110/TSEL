@@ -8,6 +8,15 @@ from typing import Any
 from .adapters import CsvAdapter, EdfAdapter, JsonAdapter, TimeSeriesCsvAdapter, TimeSeriesJsonAdapter
 from .autorouting import AutoIngestPlan, _read_json, _read_table, build_auto_ingest_plan, looks_like_normalized_tsel
 from .eeg_profiles import merge_eeg_domain_profile_into_config, resolve_eeg_edf_profile, resolve_eeg_json_profile, resolve_eeg_table_profile
+from .general_profiles import (
+    merge_general_domain_profile_into_config,
+    resolve_dream_json_profile,
+    resolve_dream_table_profile,
+    resolve_environment_json_profile,
+    resolve_environment_table_profile,
+    resolve_multisensory_json_profile,
+    resolve_multisensory_table_profile,
+)
 from .olfactory_profiles import merge_domain_profile_into_config, resolve_olfactory_json_profile, resolve_olfactory_table_profile
 from .config import EdfConfig, RecordMapping, TimeSeriesJsonConfig, TimeSeriesMapping
 from .experience import enrich_experience
@@ -163,6 +172,39 @@ class TSELPipeline:
             if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
                 return config_data
             return merge_eeg_domain_profile_into_config(config_data, resolution)
+        if active_profile == "dream":
+            if suffix in {".csv", ".tsv", ".txt"}:
+                preview = _read_table(path)
+                resolution = resolve_dream_table_profile(path, preview.fieldnames)
+            elif suffix in {".json", ".jsonl"}:
+                resolution = resolve_dream_json_profile(path, _read_json(path))
+            else:
+                return config_data
+            if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+                return config_data
+            return merge_general_domain_profile_into_config(config_data, resolution)
+        if active_profile == "environment":
+            if suffix in {".csv", ".tsv", ".txt"}:
+                preview = _read_table(path)
+                resolution = resolve_environment_table_profile(path, preview.fieldnames, preview.rows)
+            elif suffix in {".json", ".jsonl"}:
+                resolution = resolve_environment_json_profile(path, _read_json(path))
+            else:
+                return config_data
+            if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+                return config_data
+            return merge_general_domain_profile_into_config(config_data, resolution)
+        if active_profile == "multisensory":
+            if suffix in {".csv", ".tsv", ".txt"}:
+                preview = _read_table(path)
+                resolution = resolve_multisensory_table_profile(path, preview.fieldnames, preview.rows)
+            elif suffix in {".json", ".jsonl"}:
+                resolution = resolve_multisensory_json_profile(path, _read_json(path))
+            else:
+                return config_data
+            if resolution.profile_id is None or resolution.resolution_status in {"ambiguous", "unresolved"}:
+                return config_data
+            return merge_general_domain_profile_into_config(config_data, resolution)
         return config_data
 
     def _ingest_with_config(self, input_path: str | Path, config_data: dict[str, Any]) -> TemporalEventCollection:

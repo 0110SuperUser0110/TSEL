@@ -53,6 +53,8 @@ def test_auto_route_plan_describes_olfaction_matrix() -> None:
 def test_pipeline_ingest_file_prefers_normalized_when_present() -> None:
     pipeline = TSELPipeline()
     normalized_path = ROOT / "output" / "demo.bundle.json"
+    batch = pipeline.ingest_many(pipeline.load_manifest(ROOT / "examples" / "configs" / "demo_manifest.json"))
+    write_events(normalized_path, batch, fmt="bundle")
 
     assert looks_like_normalized_tsel(normalized_path)
     collection = pipeline.ingest_file(normalized_path)
